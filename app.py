@@ -9,7 +9,7 @@ import os
 import time
 
 import requests
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request
 
 try:
     from dotenv import load_dotenv
@@ -465,14 +465,28 @@ def fallback_plan(ctx, profile):
 # ----------------------------------------------------------------------------
 # API routes
 # ----------------------------------------------------------------------------
+def _page(name):
+    """Read an HTML page from disk. Works on a normal server and inside a Vercel function."""
+    for base in (HERE, os.getcwd(), os.path.join(os.getcwd(), "..")):
+        path = os.path.join(base, name)
+        if os.path.isfile(path):
+            with open(path, "rb") as f:
+                return Response(f.read(), mimetype="text/html; charset=utf-8")
+    return Response("Page not found: " + name, status=404)
+
+
 @app.get("/")
+@app.get("/landing")
+@app.get("/landing.html")
 def landing():
-    return send_from_directory(HERE, "landing.html")
+    return _page("landing.html")
 
 
 @app.get("/app")
+@app.get("/app/")
+@app.get("/index.html")
 def app_page():
-    return send_from_directory(HERE, "index.html")
+    return _page("index.html")
 
 
 @app.get("/api/health")

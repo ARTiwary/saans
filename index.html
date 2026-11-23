@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Saans - Breathe smarter this winter</title>
+<meta name="description" content="GenAI assistant for families and communities facing winter smog: live AQI, personalised low-emission routines, indoor air hacks and measurable impact.">
+<style>
+:root{
+  --bg:#08111c; --bg2:#0d1a2a; --card:#111f31; --card2:#162840; --line:rgba(255,255,255,.08);
+  --text:#e9f0f7; --muted:#8ea4bb; --accent:#3ddc97; --accent2:#4cc9f0; --warn:#ffb703; --aqi:#e67e22;
+  --radius:18px;
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Devanagari",sans-serif;background:radial-gradient(1200px 600px at 80% -10%,color-mix(in srgb,var(--aqi) 22%,transparent),transparent),var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.25rem;letter-spacing:.2px}
+.logo{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#06231a;font-size:1.2rem}
+.brand small{display:block;font-weight:500;font-size:.72rem;color:var(--muted);letter-spacing:.3px}
+.top-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.pill{border:1px solid var(--line);background:var(--card);padding:6px 11px;border-radius:999px;font-size:.78rem;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:#777}
+.dot.on{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+select.pill{appearance:none;cursor:pointer}
+.card{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+h2{font-size:1.1rem;margin-bottom:4px}
+.sub{color:var(--muted);font-size:.86rem;margin-bottom:14px}
+.grid{display:grid;gap:16px}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:20px}
+@media(max-width:820px){.hero{grid-template-columns:1fr}}
+.search{position:relative}
+.search input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:#0a1624;outline:none}
+.search input:focus{border-color:var(--accent2)}
+.results{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#0a1624;border:1px solid var(--line);border-radius:12px;z-index:10;overflow:hidden}
+.results button{display:block;width:100%;text-align:left;background:none;border:0;padding:10px 14px;cursor:pointer}
+.results button:hover{background:var(--card2)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn{border:0;cursor:pointer;padding:11px 16px;border-radius:12px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04231a;transition:transform .1s,opacity .2s}
+.btn:hover{transform:translateY(-1px)}
+.btn:disabled{opacity:.6;cursor:wait;transform:none}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+.place{font-size:1.05rem;font-weight:700;margin:14px 0 2px}
+.advice{margin-top:12px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--aqi) 16%,transparent);border:1px solid color-mix(in srgb,var(--aqi) 45%,transparent);font-size:.92rem}
+.gauge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.ring{width:190px;height:190px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--aqi) 0%,rgba(255,255,255,.08) 0)}
+.ring>div{width:156px;height:156px;border-radius:50%;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring b{font-size:3rem;line-height:1;color:var(--aqi)}
+.ring span{font-size:.72rem;color:var(--muted);margin-top:4px;letter-spacing:.8px}
+.cat{font-weight:700;color:var(--aqi);text-align:center}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px;width:100%}
+.stat{background:#0a1624;border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center}
+.stat b{display:block;font-size:1rem}.stat small{color:var(--muted);font-size:.7rem}
+.cigs{margin-top:10px;font-size:.9rem;color:var(--muted);text-align:center}
+.cigs b{color:var(--warn)}
+.fc{display:flex;align-items:flex-end;gap:3px;height:130px;margin-top:8px}
+.fc div.bar{flex:1;border-radius:5px 5px 2px 2px;min-height:6px;position:relative}
+.fc div.bar.best{outline:2px solid var(--accent);outline-offset:1px}
+.fc div.bar.worst{outline:2px dashed #ff6b6b;outline-offset:1px}
+.fl{display:flex;gap:3px;margin-top:6px}.fl span{flex:1;text-align:center;font-size:.62rem;color:var(--muted)}
+.wins{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.win{flex:1;min-width:200px;border-radius:12px;padding:10px 12px;font-size:.88rem;border:1px solid var(--line)}
+.win.good{background:rgba(61,220,151,.1);border-color:rgba(61,220,151,.4)}
+.win.bad{background:rgba(255,107,107,.1);border-color:rgba(255,107,107,.4)}
+.label{font-size:.8rem;color:var(--muted);margin:14px 0 6px;font-weight:600}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chips button{border:1px solid var(--line);background:#0a1624;padding:7px 12px;border-radius:999px;cursor:pointer;font-size:.86rem;color:var(--muted);transition:.15s}
+.chips button[aria-pressed=true]{background:rgba(61,220,151,.16);border-color:var(--accent);color:var(--text)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:600px){.two{grid-template-columns:1fr}}
+.range{display:flex;align-items:center;gap:10px}.range input{flex:1;accent-color:var(--accent)}.range output{min-width:48px;text-align:right;font-weight:700}
+textarea,.txt{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:#0a1624;outline:none;resize:vertical}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin:12px 0}
+.tabs button{white-space:nowrap;border:1px solid var(--line);background:#0a1624;padding:8px 14px;border-radius:999px;cursor:pointer;color:var(--muted);font-weight:600;font-size:.88rem}
+.tabs button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04231a;border-color:transparent}
+.items{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.item{background:#0a1624;border:1px solid var(--line);border-radius:14px;padding:14px}
+.item h4{font-size:.98rem;margin-bottom:4px;display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.item p{font-size:.88rem;color:#c5d3e2}
+.cost{font-size:.7rem;border:1px solid var(--line);padding:2px 8px;border-radius:999px;color:var(--muted);white-space:nowrap}
+.why{margin-top:8px;font-size:.8rem;color:var(--muted)}
+.impact{margin-top:8px;font-size:.82rem;padding:7px 10px;border-radius:10px;background:rgba(76,201,240,.1);border:1px solid rgba(76,201,240,.3)}
+.when{grid-column:1/-1;font-weight:700;color:var(--accent2);margin-top:6px;font-size:.9rem;text-transform:capitalize}
+.headline{font-size:1.25rem;font-weight:800;margin-bottom:6px}
+.src{font-size:.75rem;color:var(--muted);margin-top:10px}
+.note{padding:10px 12px;border-radius:12px;background:rgba(255,183,3,.1);border:1px solid rgba(255,183,3,.35);font-size:.85rem;margin-bottom:10px}
+.warns li{margin-left:18px;margin-bottom:4px}
+.skeleton{height:90px;border-radius:14px;background:linear-gradient(90deg,#0a1624,#14263c,#0a1624);background-size:200% 100%;animation:sh 1.2s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+.switches{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px}
+.sw{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#0a1624;border:1px solid var(--line);cursor:pointer;font-size:.88rem}
+.sw input{accent-color:var(--accent);width:18px;height:18px}
+.bars{margin-top:14px}
+.bl{display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px;color:var(--muted)}
+.track{height:16px;background:#0a1624;border-radius:99px;overflow:hidden;margin-bottom:12px;border:1px solid var(--line)}
+.fill{height:100%;border-radius:99px;transition:width .5s}
+.big{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+@media(max-width:600px){.big{grid-template-columns:1fr}}
+.kpi{background:#0a1624;border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+.kpi b{font-size:1.5rem;display:block;color:var(--accent)}.kpi small{color:var(--muted);font-size:.76rem}
+.levers{margin-top:14px;font-size:.88rem}.levers li{margin-left:18px;margin-bottom:3px}
+details{margin-top:12px;font-size:.78rem;color:var(--muted)}details li{margin-left:18px}
+.chat{display:flex;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto;padding:4px;margin-bottom:10px}
+.msg{max-width:88%;padding:10px 13px;border-radius:14px;font-size:.92rem;white-space:normal}
+.msg.u{align-self:flex-end;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04231a}
+.msg.a{align-self:flex-start;background:#0a1624;border:1px solid var(--line)}
+.msg ul{margin-left:18px}
+.chatbar{display:flex;gap:8px}.chatbar input{flex:1;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:#0a1624;outline:none}
+.sugg{margin-bottom:10px}
+footer{color:var(--muted);font-size:.78rem;text-align:center;padding:20px 0 40px}
+.err{color:#ff8a8a;font-size:.85rem;margin-top:8px}
+.hidden{display:none!important}
+@media print{header,.chat,#chatCard,#profileCard{display:none}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <a href="/" class="brand" style="text-decoration:none;color:inherit" aria-label="Saans home"><div class="logo">🌬️</div><div>Saans<small>Breathe smarter this winter</small></div></a>
+  <div class="top-right">
+    <span class="pill"><span class="dot" id="aiDot"></span><span id="aiTxt">checking AI…</span></span>
+    <select class="pill" id="lang" aria-label="AI reply language">
+      <option value="en">AI replies: English</option>
+      <option value="hi">AI replies: हिन्दी</option>
+    </select>
+  </div>
+</header>
+
+<!-- AIR NOW -->
+<section class="card">
+  <div class="hero">
+    <div>
+      <h2>1 · Where are you?</h2>
+      <div class="sub">Live air quality for your neighbourhood, powered by open data.</div>
+      <div class="search">
+        <input id="q" placeholder="Search city or area (e.g. Delhi, Lucknow, Patna, Ranchi)…" autocomplete="off">
+        <div class="results hidden" id="results"></div>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="geo">📍 Use my location</button>
+        <button class="btn ghost" id="refresh">↻ Refresh</button>
+      </div>
+      <div class="place" id="place">Loading…</div>
+      <div class="sub" id="updated"></div>
+      <div class="advice" id="advice">…</div>
+      <div class="err" id="airErr"></div>
+    </div>
+    <div class="gauge">
+      <div class="ring" id="ring"><div><b id="aqi">–</b><span>US AQI</span></div></div>
+      <div class="cat" id="cat">–</div>
+      <div class="stats">
+        <div class="stat"><b id="pm25">–</b><small>PM2.5 µg/m³</small></div>
+        <div class="stat"><b id="pm10">–</b><small>PM10 µg/m³</small></div>
+        <div class="stat"><b id="trend">–</b><small>next 6 h</small></div>
+        <div class="stat"><b id="temp">–</b><small>Temp °C</small></div>
+        <div class="stat"><b id="hum">–</b><small>Humidity %</small></div>
+        <div class="stat"><b id="wind">–</b><small>Wind km/h</small></div>
+      </div>
+      <div class="cigs" id="cigs"></div>
+    </div>
+  </div>
+</section>
+
+<!-- FORECAST -->
+<section class="card">
+  <h2>Next 24 hours - when is the air cleanest?</h2>
+  <div class="sub">Plan school runs, walks and workouts for the green window. Winter smog usually peaks at night and early morning.</div>
+  <div class="fc" id="fc"></div><div class="fl" id="fl"></div>
+  <div class="wins" id="wins"></div>
+</section>
+
+<!-- PROFILE -->
+<section class="card" id="profileCard">
+  <h2>2 · Tell us about your household</h2>
+  <div class="sub">Everything stays on your device except what is sent to generate your plan.</div>
+  <div class="label">Who lives with you?</div>
+  <div class="chips" data-key="household" data-multi="1">
+    <button data-v="children">👶 Children</button><button data-v="elderly">👴 Elderly</button>
+    <button data-v="pregnant">🤰 Pregnancy</button><button data-v="asthma">🫁 Asthma / lung / heart</button><button data-v="pets">🐕 Pets</button>
+  </div>
+  <div class="two">
+    <div><div class="label">How do you commute?</div>
+      <div class="chips" data-key="mode">
+        <button data-v="walk">🚶 Walk</button><button data-v="cycle">🚲 Cycle</button><button data-v="two_wheeler">🏍️ Two-wheeler</button>
+        <button data-v="auto_cab">🛺 Auto/cab</button><button data-v="car">🚗 Car</button><button data-v="bus">🚌 Bus</button>
+        <button data-v="metro">🚇 Metro</button><button data-v="wfh">🏠 Work from home</button>
+      </div></div>
+    <div><div class="label">Public transit near you?</div>
+      <div class="chips" data-key="transit"><button data-v="true">Yes</button><button data-v="false">No</button></div>
+      <div class="label">Home type</div>
+      <div class="chips" data-key="home"><button data-v="apartment">🏢 Apartment</button><button data-v="independent house">🏠 House</button><button data-v="single room / rented">🚪 Single room</button></div></div>
+  </div>
+  <div class="two">
+    <div><div class="label">Commute distance (one way)</div>
+      <div class="range"><input type="range" id="km" min="0" max="40" value="8"><output id="kmo">8 km</output></div></div>
+    <div><div class="label">Hours outdoors per day (excl. commute)</div>
+      <div class="range"><input type="range" id="oh" min="0" max="10" step="0.5" value="2"><output id="oho">2 h</output></div></div>
+  </div>
+  <div class="two">
+    <div><div class="label">Windows at home are usually…</div>
+      <div class="chips" data-key="windows"><button data-v="open">Open</button><button data-v="closed">Closed</button></div>
+      <div class="label">Do you already run an air purifier?</div>
+      <div class="chips" data-key="purifier_owned"><button data-v="true">Yes</button><button data-v="false">No</button></div></div>
+    <div><div class="label">Cooking fuel</div>
+      <div class="chips" data-key="cooking"><button data-v="LPG">LPG</button><button data-v="induction/electric">Induction</button><button data-v="biomass (wood/dung/coal)">Wood/coal</button><button data-v="PNG/CNG">PNG</button></div>
+      <div class="label">Budget for improvements</div>
+      <div class="chips" data-key="budget"><button data-v="none">₹0 - free only</button><button data-v="low">Low (&lt;₹2k)</button><button data-v="medium">Medium (₹2-15k)</button></div></div>
+  </div>
+  <div class="label">Anything else? (optional)</div>
+  <textarea id="notes" rows="2" class="txt" placeholder="e.g. Child with dust allergy, we live near a main road, baby is 8 months old…"></textarea>
+  <div class="row"><button class="btn" id="gen">✨ Generate my smog plan</button></div>
+  <div class="err" id="planErr"></div>
+</section>
+
+<!-- PLAN -->
+<section class="card hidden" id="planCard">
+  <div class="headline" id="pHead"></div>
+  <div class="sub" id="pRisk" style="font-size:.95rem;color:#c5d3e2"></div>
+  <div class="note hidden" id="pNote"></div>
+  <div class="tabs" id="tabs"></div>
+  <div id="pBody"></div>
+  <div class="row">
+    <button class="btn ghost" id="wa">📲 Share on WhatsApp</button>
+    <button class="btn ghost" id="print">🖨️ Print / save PDF</button>
+  </div>
+  <div class="src" id="pSrc"></div>
+</section>
+
+<!-- IMPACT -->
+<section class="card hidden" id="impactCard">
+  <h2>3 · See the direct impact of your choices</h2>
+  <div class="sub">Flip the switches. Numbers come from a transparent exposure model (assumptions below), not from the AI.</div>
+  <div class="switches">
+    <label class="sw"><input type="checkbox" id="s_win"> Keep windows shut in smog hours</label>
+    <label class="sw"><input type="checkbox" id="s_pur"> Run HEPA purifier at home</label>
+    <label class="sw"><input type="checkbox" id="s_mask"> Wear a fitted N95 outdoors</label>
+    <label class="sw"><input type="checkbox" id="s_shift"> Go out only in the clean window</label>
+    <label class="sw" style="grid-column:1/-1">🚇 Switch commute to
+      <select id="s_mode" class="txt" style="width:auto;padding:6px 10px">
+        <option value="">(no change)</option><option value="metro">Metro</option><option value="bus">Bus</option>
+        <option value="cycle">Cycle</option><option value="walk">Walk</option><option value="wfh">Work from home</option></select></label>
+  </div>
+  <div class="bars">
+    <div class="bl"><span>Your daily PM2.5 exposure today</span><b id="bv">–</b></div>
+    <div class="track"><div class="fill" id="bf" style="background:#e74c3c;width:100%"></div></div>
+    <div class="bl"><span>With your choices</span><b id="sv">–</b></div>
+    <div class="track"><div class="fill" id="sf" style="background:var(--accent);width:100%"></div></div>
+  </div>
+  <div class="big">
+    <div class="kpi"><b id="k1">–</b><small>lower daily exposure</small></div>
+    <div class="kpi"><b id="k2">–</b><small>cigarette-equivalents / day</small></div>
+    <div class="kpi"><b id="k3">–</b><small>kg CO₂ saved / year</small></div>
+  </div>
+  <div class="levers"><b>Your biggest levers (each alone):</b><ul id="lev"></ul></div>
+  <details><summary>How is this calculated?</summary><ul id="assume"></ul></details>
+</section>
+
+<!-- CHAT -->
+<section class="card" id="chatCard">
+  <h2>Ask Saans anything</h2>
+  <div class="sub">Context-aware answers using your live air data and household profile.</div>
+  <div class="chips sugg" id="sugg">
+    <button>Can my kids play outside today?</button>
+    <button>Is it safe to jog tomorrow morning?</button>
+    <button>Do cloth masks work against smog?</button>
+    <button>Cheapest way to clean my bedroom air?</button>
+  </div>
+  <div class="chat" id="chat"><div class="msg a">Hi! I'm Saans 👋 Pick a location above, then ask me about today's air - routines, masks, purifiers, travel, school runs…</div></div>
+  <div class="chatbar"><input id="ci" placeholder="Type your question…"><button class="btn" id="cs">Send</button></div>
+  <div class="err" id="chatErr"></div>
+</section>
+
+<footer>
+  Data: Open-Meteo Air Quality (CAMS) · US AQI scale · AI: Groq · Estimates are for planning, not medical advice.<br>
+  If you have chest pain, severe breathlessness or fainting, seek medical care immediately.
+</footer>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LS = {get:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}}, set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const state = {loc: LS.get('saans_loc',{name:'Delhi, India',lat:28.6139,lon:77.209}), air:null, plan:null, chat:[], profile: LS.get('saans_profile',{
+  household:[], mode:'two_wheeler', transit:'true', home:'apartment', commute_km:8, outdoor_hours:2,
+  windows:'open', purifier_owned:'false', cooking:'LPG', budget:'low', notes:''})};
+
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+/* ---------- health ---------- */
+api('/api/health').then(h=>{ $('#aiDot').classList.toggle('on',h.groq); $('#aiTxt').textContent = h.groq ? 'Groq AI · '+h.model : 'Offline smart-rules mode'; })
+  .catch(()=>{ $('#aiTxt').textContent='server unreachable'; });
+
+/* ---------- location ---------- */
+let timer;
+$('#q').addEventListener('input', e=>{
+  clearTimeout(timer); const v=e.target.value.trim();
+  if(v.length<2){ $('#results').classList.add('hidden'); return; }
+  timer=setTimeout(async()=>{
+    try{
+      const {results}=await api('/api/geocode?q='+encodeURIComponent(v));
+      const box=$('#results'); box.innerHTML='';
+      results.forEach(r=>{
+        const b=document.createElement('button');
+        b.textContent=[r.name,r.admin,r.country].filter(Boolean).join(', ');
+        b.onclick=()=>{ setLoc({name:b.textContent,lat:r.lat,lon:r.lon}); box.classList.add('hidden'); $('#q').value=''; };
+        box.appendChild(b);
+      });
+      box.classList.toggle('hidden',!results.length);
+    }catch{}
+  },300);
+});
+document.addEventListener('click',e=>{ if(!e.target.closest('.search')) $('#results').classList.add('hidden'); });
+$('#geo').onclick=()=>{
+  if(!navigator.geolocation){ $('#airErr').textContent='Geolocation is not supported in this browser.'; return; }
+  $('#place').textContent='Finding you…';
+  navigator.geolocation.getCurrentPosition(p=>setLoc({name:'Your location',lat:p.coords.latitude,lon:p.coords.longitude}),
+    ()=>{ $('#airErr').textContent='Location permission denied - search for your city instead.'; $('#place').textContent=state.loc.name; });
+};
+$('#refresh').onclick=()=>loadAir();
+function setLoc(l){ state.loc=l; LS.set('saans_loc',l); state.plan=null; $('#planCard').classList.add('hidden'); loadAir(); }
+
+async function loadAir(){
+  $('#place').textContent=state.loc.name; $('#airErr').textContent='';
+  try{
+    const a=await api(`/api/air?lat=${state.loc.lat}&lon=${state.loc.lon}`);
+    state.air=a; renderAir(a); updateImpact();
+  }catch(e){ $('#airErr').textContent=e.message; }
+}
+function renderAir(a){
+  document.documentElement.style.setProperty('--aqi',a.color);
+  $('#aqi').textContent=a.aqi??'–'; $('#cat').textContent=a.category;
+  $('#ring').style.background=`conic-gradient(${a.color} ${Math.min(a.aqi||0,300)/3}%,rgba(255,255,255,.08) 0)`;
+  $('#pm25').textContent=a.pm25??'–'; $('#pm10').textContent=a.pm10??'–';
+  $('#temp').textContent=a.temp??'–'; $('#hum').textContent=a.humidity??'–'; $('#wind').textContent=a.wind??'–';
+  $('#trend').textContent={worsening:'↗ worse',improving:'↘ better',steady:'→ steady'}[a.trend];
+  $('#advice').textContent=a.advice;
+  $('#updated').textContent='Updated '+(a.time||'').replace('T',' ');
+  $('#cigs').innerHTML=`Breathing today's PM2.5 for 24 h ≈ <b>${a.cigarettes} cigarette${a.cigarettes==1?'':'s'}</b> <span title="Berkeley Earth rule of thumb: ~22 µg/m³ ≈ 1 cigarette/day">ⓘ</span>`;
+  // forecast
+  const fc=$('#fc'), fl=$('#fl'); fc.innerHTML=''; fl.innerHTML='';
+  const max=Math.max(150,...a.forecast.map(h=>h.aqi||0));
+  const inWin=(w,i)=>w && i>=w.i && i<w.i+3;
+  a.forecast.forEach((h,i)=>{
+    const d=document.createElement('div'); d.className='bar'+(inWin(a.best,i)?' best':'')+(inWin(a.worst,i)?' worst':'');
+    d.style.height=Math.max(6,(h.aqi||0)/max*100)+'%'; d.style.background=h.color; d.title=`${h.t.slice(11,16)} · AQI ${h.aqi} · PM2.5 ${h.pm25}`;
+    fc.appendChild(d);
+    const s=document.createElement('span'); s.textContent=i%3===0?(+h.t.slice(11,13)%12||12)+(+h.t.slice(11,13)<12?'a':'p'):''; fl.appendChild(s);
+  });
+  $('#wins').innerHTML=(a.best?`<div class="win good">✅ <b>Cleanest window:</b> ${esc(a.best.label)} (${a.best.day})<br><small>~AQI ${a.best.aqi} · PM2.5 ${a.best.pm25} - best for walks, school runs, workouts</small></div>`:'')
+    +(a.worst?`<div class="win bad">⚠️ <b>Worst window:</b> ${esc(a.worst.label)} (${a.worst.day})<br><small>~AQI ${a.worst.aqi} · PM2.5 ${a.worst.pm25} - stay in, windows shut</small></div>`:'');
+}
+
+/* ---------- profile ---------- */
+function applyProfile(){
+  document.querySelectorAll('.chips[data-key]').forEach(g=>{
+    const k=g.dataset.key, multi=g.dataset.multi, val=state.profile[k];
+    g.querySelectorAll('button').forEach(b=>{
+      const on = multi ? (val||[]).includes(b.dataset.v) : String(val)===b.dataset.v;
+      b.setAttribute('aria-pressed',on);
+    });
+  });
+  $('#km').value=state.profile.commute_km; $('#kmo').textContent=state.profile.commute_km+' km';
+  $('#oh').value=state.profile.outdoor_hours; $('#oho').textContent=state.profile.outdoor_hours+' h';
+  $('#notes').value=state.profile.notes||'';
+}
+document.querySelectorAll('.chips[data-key] button').forEach(b=>b.addEventListener('click',()=>{
+  const g=b.parentElement, k=g.dataset.key;
+  if(g.dataset.multi){ const s=new Set(state.profile[k]||[]); s.has(b.dataset.v)?s.delete(b.dataset.v):s.add(b.dataset.v); state.profile[k]=[...s]; }
+  else state.profile[k]=b.dataset.v;
+  saveProfile();
+}));
+$('#km').oninput=e=>{state.profile.commute_km=+e.target.value;saveProfile()};
+$('#oh').oninput=e=>{state.profile.outdoor_hours=+e.target.value;saveProfile()};
+$('#notes').oninput=e=>{state.profile.notes=e.target.value;LS.set('saans_profile',state.profile)};
+function saveProfile(){ LS.set('saans_profile',state.profile); applyProfile(); updateImpact(); }
+function profilePayload(){
+  const p={...state.profile};
+  p.transit=p.transit==='true'; p.purifier_owned=p.purifier_owned==='true'; return p;
+}
+function contextPayload(){ const a=state.air||{}; return {place:state.loc.name,aqi:a.aqi,category:a.category,idx:a.idx,pm25:a.pm25,pm10:a.pm10,no2:a.no2,o3:a.o3,temp:a.temp,humidity:a.humidity,wind:a.wind,trend:a.trend,best:a.best,worst:a.worst}; }
+
+/* ---------- plan ---------- */
+const TABS=[['routine','🗓️ Daily routine'],['indoor_hacks','🏠 Indoor air hacks'],['sustainable_swaps','♻️ Sustainable swaps'],['community_actions','🤝 Community'],['care','💛 Care & warning signs']];
+let curTab='routine';
+$('#gen').onclick=async()=>{
+  if(!state.air){ $('#planErr').textContent='Waiting for air data - try again in a second.'; return; }
+  const btn=$('#gen'); btn.disabled=true; btn.textContent='Thinking…'; $('#planErr').textContent='';
+  $('#planCard').classList.remove('hidden'); $('#pHead').textContent='Building your plan…'; $('#pRisk').textContent=''; $('#tabs').innerHTML='';
+  $('#pBody').innerHTML='<div class="items"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>';
+  $('#planCard').scrollIntoView({behavior:'smooth',block:'start'});
+  try{
+    const r=await api('/api/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({context:contextPayload(),profile:profilePayload(),lang:$('#lang').value})});
+    state.plan=r; renderPlan(r); $('#impactCard').classList.remove('hidden');
+    // pre-set the simulator to the recommended scenario
+    $('#s_win').checked=true; $('#s_pur').checked=state.profile.budget!=='none'; $('#s_mask').checked=(state.air.pm25||0)>55; $('#s_shift').checked=true;
+    updateImpact();
+  }catch(e){ $('#planErr').textContent=e.message; $('#planCard').classList.add('hidden'); }
+  btn.disabled=false; btn.textContent='✨ Generate my smog plan';
+};
+function itemHTML(i){
+  return `<div class="item"><h4><span>${esc(i.title)}</span>${i.cost?`<span class="cost">${esc(i.cost).replace(/Rs/g,'₹')}</span>`:''}</h4>
+    <p>${esc(i.detail)}</p>${i.why?`<div class="why"><b>Why:</b> ${esc(i.why)}</div>`:''}${i.impact?`<div class="impact">🎯 ${esc(i.impact)}</div>`:''}</div>`;
+}
+function renderTab(){
+  const p=state.plan.plan; let h='<div class="items">';
+  if(curTab==='routine'){
+    ['morning','afternoon','evening','night'].forEach(w=>{
+      const L=p.routine.filter(x=>x.when===w); if(!L.length) return;
+      h+=`<div class="when">${{morning:'🌅',afternoon:'☀️',evening:'🌆',night:'🌙'}[w]} ${w}</div>`+L.map(itemHTML).join('');
+    });
+  } else if(curTab==='care'){
+    h+=p.care.map(c=>`<div class="item"><h4>${esc(c.title)}</h4><p>${esc(c.detail)}</p></div>`).join('');
+    h+=`<div class="item" style="grid-column:1/-1;border-color:rgba(255,107,107,.4)"><h4>🚨 Seek medical help if…</h4><ul class="warns">${p.warning_signs.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
+    if(p.myth?.myth) h+=`<div class="item" style="grid-column:1/-1"><h4>💡 Myth buster</h4><p><b>Myth:</b> ${esc(p.myth.myth)}<br><b>Truth:</b> ${esc(p.myth.truth)}</p></div>`;
+  } else h+=(p[curTab]||[]).map(itemHTML).join('');
+  $('#pBody').innerHTML=h+'</div>';
+}
+function renderPlan(r){
+  const p=r.plan; $('#pHead').textContent=p.headline; $('#pRisk').textContent=p.risk_summary;
+  const n=$('#pNote'); if(r.source!=='groq'){ n.classList.remove('hidden'); n.textContent='Showing the built-in offline plan'+(r.error?` (${r.error})`:'')+'. Add a valid GROQ_API_KEY for fully personalised AI plans.'; } else n.classList.add('hidden');
+  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button data-k="${k}" class="${k===curTab?'on':''}">${l}</button>`).join('');
+  $('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{curTab=b.dataset.k;renderPlan(state.plan)});
+  $('#pSrc').textContent=r.source==='groq'?`Generated by Groq · ${r.model} · using live AQI ${state.air.aqi} and your profile`:'Rule-based plan using live AQI and your profile';
+  renderTab();
+}
+$('#wa').onclick=()=>{
+  const p=state.plan?.plan; if(!p) return; const a=state.air;
+  const top=p.routine.slice(0,5).map(x=>'• '+x.title).join('\n');
+  const t=`🌬️ Saans smog plan - ${state.loc.name}\nAQI ${a.aqi} (${a.category}) · PM2.5 ${a.pm25}\n${p.headline}\n\n${top}\n\nCleanest window: ${a.best?.label} (${a.best?.day})`;
+  window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
+};
+$('#print').onclick=()=>window.print();
+
+/* ---------- impact ---------- */
+let it;
+['s_win','s_pur','s_mask','s_shift','s_mode'].forEach(id=>$('#'+id).addEventListener('change',updateImpact));
+function updateImpact(){
+  if(!state.air||$('#impactCard').classList.contains('hidden')) return;
+  clearTimeout(it); it=setTimeout(async()=>{
+    const p=profilePayload();
+    try{
+      const r=await api('/api/impact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        pm25:state.air.pm25,best_pm25:state.air.best?.pm25,outdoor_hours:p.outdoor_hours,commute_km:p.commute_km,mode:p.mode,
+        baseline_windows:p.windows,baseline_purifier:p.purifier_owned,
+        scenario:{windows_closed:$('#s_win').checked,purifier:$('#s_pur').checked,mask:$('#s_mask').checked,shift_outdoor:$('#s_shift').checked,new_mode:$('#s_mode').value}})});
+      $('#bv').textContent=r.baseline_pm25+' µg/m³'; $('#sv').textContent=r.scenario_pm25+' µg/m³';
+      $('#bf').style.width='100%'; $('#sf').style.width=Math.max(4,r.scenario_pm25/Math.max(r.baseline_pm25,.1)*100)+'%';
+      $('#k1').textContent=r.reduction_pct+'%'; $('#k2').textContent=r.cigs_baseline+' → '+r.cigs_scenario; $('#k3').textContent=r.co2_saved_kg_year;
+      $('#lev').innerHTML=r.levers.map(l=>`<li>${esc(l.label)} - <b>~${l.reduction_pct}%</b> lower</li>`).join('');
+      $('#assume').innerHTML=r.assumptions.map(a=>`<li>${esc(a)}</li>`).join('');
+    }catch{}
+  },150);
+}
+
+/* ---------- chat ---------- */
+function md(t){
+  const lines=esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').split('\n'); let out='',inl=false;
+  lines.forEach(l=>{ const m=l.match(/^\s*[-•*]\s+(.*)/);
+    if(m){ if(!inl){out+='<ul>';inl=true} out+='<li>'+m[1]+'</li>'; } else { if(inl){out+='</ul>';inl=false} if(l.trim()) out+='<p>'+l+'</p>'; } });
+  return out+(inl?'</ul>':'');
+}
+function addMsg(role,text,html){ const d=document.createElement('div'); d.className='msg '+(role==='user'?'u':'a'); html?d.innerHTML=text:d.textContent=text; $('#chat').appendChild(d); $('#chat').scrollTop=1e9; return d; }
+async function send(text){
+  if(!text.trim()) return; $('#chatErr').textContent='';
+  addMsg('user',text); state.chat.push({role:'user',content:text}); $('#ci').value='';
+  const typing=addMsg('assistant','Thinking…');
+  try{
+    const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:state.chat,context:contextPayload(),profile:profilePayload(),lang:$('#lang').value})});
+    typing.innerHTML=md(r.reply); state.chat.push({role:'assistant',content:r.reply});
+  }catch(e){ typing.remove(); state.chat.pop(); $('#chatErr').textContent=e.message; }
+  $('#chat').scrollTop=1e9;
+}
+$('#cs').onclick=()=>send($('#ci').value);
+$('#ci').addEventListener('keydown',e=>{ if(e.key==='Enter') send($('#ci').value); });
+document.querySelectorAll('#sugg button').forEach(b=>b.onclick=()=>send(b.textContent));
+
+/* ---------- init ---------- */
+applyProfile(); loadAir();
+</script>
+</body>
+</html>
