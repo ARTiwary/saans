@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Saans - Breathe smarter this winter</title>
+<meta name="description" content="Saans turns live air data into a daily plan for your household and shows exactly what each choice changes in the air you breathe.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0B1B2B; --muted:#44566A; --soft:#6B7C90; --line:#E3EAF2; --bg:#fff; --bg2:#F4F8FB;
+  --teal:#0E8F82; --teal-d:#0A7468; --mint:#5EEAD4; --mint-bg:#E6F6F3;
+  --r:20px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Manrope',system-ui,-apple-system,'Segoe UI','Noto Sans','Noto Sans Devanagari',sans-serif;color:var(--ink);background:var(--bg);line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px;border-radius:8px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 40px}
+@media(max-width:640px){.wrap{padding:0 20px}}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.86);backdrop-filter:blur(14px);border-bottom:1px solid transparent;transition:border-color .2s}
+.nav.scrolled{border-color:var(--line)}
+.nav .in{display:flex;align-items:center;justify-content:space-between;height:72px;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px;letter-spacing:-.3px}
+.links{display:flex;align-items:center;gap:28px;font-size:15px;font-weight:600}
+.links a:hover{color:var(--teal)}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 26px;border-radius:14px;font-weight:700;font-size:16px;border:1.5px solid transparent;cursor:pointer;transition:transform .15s,background .2s,border-color .2s,box-shadow .2s}
+.btn:hover{transform:translateY(-2px)}
+.btn.p{background:var(--teal);color:#fff;box-shadow:0 12px 24px -10px rgba(14,143,130,.6)}
+.btn.p:hover{background:var(--teal-d)}
+.btn.g{border-color:#D5DEE8;background:#fff}
+.btn.g:hover{border-color:var(--ink)}
+.btn.sm{min-height:44px;padding:0 20px;font-size:15px;border-radius:12px}
+.menu{display:none;min-height:44px;min-width:44px;border:1.5px solid #D5DEE8;border-radius:12px;background:#fff;cursor:pointer;font-size:20px}
+@media(max-width:860px){.links a:not(.btn){display:none}.links{gap:10px}}
+
+/* hero */
+.hero{position:relative;overflow:hidden}
+.hero .glow{position:absolute;right:-200px;top:-200px;width:800px;height:800px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#E6F6F3 0%,rgba(230,246,243,0) 68%);pointer-events:none}
+.hero .grid{position:relative;display:flex;flex-wrap:wrap;gap:40px;align-items:center;padding-block:36px 70px}
+.hero .copy{flex:1 1 460px;min-width:0}
+.hero .viz{flex:1 1 480px;min-width:0}
+.tag{display:inline-block;font-size:13px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--teal-d);background:var(--mint-bg);padding:8px 14px;border-radius:99px}
+h1{margin-top:22px;font-size:clamp(40px,6vw,68px);line-height:1.02;letter-spacing:-.04em;font-weight:800}
+.lead{margin-top:22px;font-size:19px;line-height:1.6;color:var(--muted);max-width:540px}
+.cta{display:flex;gap:14px;flex-wrap:wrap;margin-top:30px}
+.live{display:inline-flex;align-items:center;gap:8px;margin-top:22px;font-size:13px;font-weight:700;color:var(--soft)}
+.live i{width:8px;height:8px;border-radius:50%;background:#bbb;display:inline-block}
+.live.on i{background:#22A861;box-shadow:0 0 0 4px rgba(34,168,97,.18)}
+
+.sim{margin-top:30px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:0 30px 60px -30px rgba(11,27,43,.28);max-width:560px}
+.sim .top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.sim label.t{font-size:14px;font-weight:700}
+.sim .val{font-size:14px;color:var(--muted)}
+.sim .val b{color:var(--ink);font-size:22px;margin-right:6px}
+input[type=range]{width:100%;margin:14px 0 6px;accent-color:var(--teal);height:28px}
+.pills{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.pill{cursor:pointer;min-height:44px;padding:0 16px;border-radius:12px;font-weight:700;font-size:14px;background:#fff;border:1.5px solid #D5DEE8;transition:all .2s}
+.pill:hover{border-color:var(--ink)}
+.pill[aria-pressed=true]{background:var(--teal);border-color:var(--teal);color:#fff}
+.note{margin-top:12px;font-size:13px;color:var(--soft)}
+
+.stage{perspective:1700px;height:620px;padding-top:70px;display:flex;align-items:center;justify-content:center}
+.stack{position:relative;width:300px;height:300px;transform-style:preserve-3d;transform:rotateX(58deg) rotateZ(-38deg)}
+.shadow{position:absolute;left:-70px;top:-70px;width:440px;height:440px;border-radius:50%;background:radial-gradient(circle,rgba(11,27,43,.22) 0,rgba(11,27,43,0) 66%);transform:translateZ(-30px)}
+.slab{position:absolute;left:0;top:0;width:300px;height:300px;border-radius:26px;padding:20px;text-align:left;cursor:pointer;color:var(--ink);transition:transform .5s cubic-bezier(.2,.8,.2,1),background .4s,border-color .4s,box-shadow .4s}
+.slab .l{display:block;font-size:13px;font-weight:800;letter-spacing:.8px;text-transform:uppercase}
+.slab .n{display:block;font-size:46px;font-weight:800;letter-spacing:-1.5px;margin-top:4px}
+.dot{position:absolute;border-radius:50%;pointer-events:none;transition:opacity .4s,background .4s}
+.info{background:var(--ink);color:#fff;border-radius:var(--r);padding:22px 26px;margin-top:-6px;box-shadow:0 30px 60px -30px rgba(11,27,43,.6)}
+.info .h{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}
+.info .h b{font-size:18px;font-weight:800}
+.info .h span{font-size:13px;color:var(--mint);font-weight:700}
+.info p{margin-top:8px;font-size:15px;line-height:1.55;color:#C6D3E1}
+@media(max-width:560px){.stage{height:470px;padding-top:40px}.stack{transform:rotateX(58deg) rotateZ(-38deg) scale(.72)}}
+
+/* generic sections */
+.strip{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.strip .in{display:flex;flex-wrap:wrap;gap:16px 44px;align-items:center;justify-content:center;padding-block:24px;font-size:14px;font-weight:700;color:var(--muted)}
+.strip .in .s{color:var(--soft);font-weight:600}
+section{padding:90px 0 20px}
+.eyebrow{font-size:13px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--teal-d)}
+h2{margin-top:12px;font-size:clamp(30px,4vw,42px);letter-spacing:-.035em;font-weight:800;line-height:1.1;max-width:780px}
+.two{display:flex;flex-wrap:wrap;gap:24px}
+.two>div{flex:1 1 440px;min-width:0;border-radius:28px;padding:40px}
+.two h3{margin-top:14px;font-size:clamp(26px,3vw,34px);line-height:1.15;letter-spacing:-.03em;font-weight:800}
+.two p{margin-top:16px;font-size:17px;line-height:1.65}
+.cards{display:flex;flex-wrap:wrap;gap:20px;margin-top:40px}
+.card{flex:1 1 250px;min-width:0;background:#fff;border:1px solid var(--line);border-radius:24px;padding:28px;box-shadow:0 24px 40px -30px rgba(11,27,43,.3);transition:transform .25s,box-shadow .25s}
+.card:hover{transform:translateY(-6px);box-shadow:0 40px 60px -30px rgba(11,27,43,.35)}
+.num{width:44px;height:44px;border-radius:14px;background:var(--ink);color:var(--mint);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;box-shadow:0 8px 0 -2px #1B3A52}
+.card h4{font-size:20px;font-weight:800;margin-top:20px}
+.card p{margin-top:8px;color:var(--muted);line-height:1.6;font-size:15px}
+
+.tabs{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+.tab{cursor:pointer;min-height:48px;padding:0 22px;border-radius:99px;font-weight:700;font-size:15px;background:#fff;border:1.5px solid #D5DEE8;transition:all .2s}
+.tab:hover{border-color:var(--ink)}
+.tab[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.panel{display:flex;flex-wrap:wrap;gap:30px;margin-top:28px;background:var(--bg2);border-radius:28px;padding:40px;align-items:center}
+.panel .l{flex:1 1 400px;min-width:0}
+.panel .r{flex:1 1 340px;min-width:0}
+.panel h3{font-size:clamp(24px,3vw,30px);letter-spacing:-.03em;line-height:1.15;font-weight:800}
+.bl{display:flex;gap:12px;align-items:flex-start;margin-top:14px;font-size:16px;line-height:1.55;color:#33475B}
+.bl i{flex:none;width:10px;height:10px;border-radius:3px;background:var(--teal);margin-top:7px}
+.mock{background:#fff;border-radius:22px;padding:24px;box-shadow:0 40px 60px -30px rgba(11,27,43,.4),0 0 0 1px var(--line);transform:perspective(1200px) rotateY(-8deg) rotateX(4deg);transition:transform .4s}
+.mock:hover{transform:perspective(1200px) rotateY(0) rotateX(0)}
+.mock .hd{display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:800;font-size:15px}
+.mock .tg{font-size:12px;font-weight:800;padding:6px 12px;border-radius:99px;background:#FDEBDA;color:#B65A0C}
+.mock .bar{height:10px;border-radius:99px;background:#EEF3F8;margin-top:14px;overflow:hidden}
+.mock .bar span{display:block;height:100%;border-radius:99px;transition:width .6s}
+.mock .cap{margin-top:14px;font-size:13px;color:var(--soft)}
+
+.facts{display:flex;flex-wrap:wrap;gap:20px;margin-top:36px}
+.fact{flex:1 1 230px;min-width:0;background:var(--ink);color:#fff;border-radius:24px;padding:28px;transition:transform .25s}
+.fact:hover{transform:translateY(-6px)}
+.fact b{display:block;font-size:44px;font-weight:800;letter-spacing:-.05em;color:var(--mint);line-height:1}
+.fact span{display:block;margin-top:12px;font-size:15px;line-height:1.5;color:#C6D3E1}
+
+.trust{display:flex;flex-wrap:wrap;gap:20px;margin-top:36px}
+.trust .card{box-shadow:none}
+
+details{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;font-weight:800;font-size:18px;padding:22px 0;list-style:none;display:flex;justify-content:space-between;gap:16px;min-height:44px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-size:24px;line-height:1;color:var(--teal)}
+details[open] summary::after{content:"\2212"}
+details p{padding:0 0 22px;color:var(--muted);line-height:1.65;font-size:16px}
+
+.final{background:var(--ink);color:#fff;margin-top:90px;position:relative;overflow:hidden}
+.final .glow{position:absolute;right:-120px;top:-160px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(94,234,212,.22) 0,rgba(94,234,212,0) 65%)}
+.final .in{position:relative;display:flex;flex-wrap:wrap;gap:30px;align-items:center;justify-content:space-between;padding-block:90px}
+.final h2{color:#fff;margin:0;font-size:clamp(32px,4.5vw,46px)}
+.final p{margin-top:16px;font-size:18px;color:#C6D3E1;line-height:1.6;max-width:520px}
+.btn.m{background:var(--mint);color:var(--ink);font-weight:800}
+.btn.o{border-color:rgba(255,255,255,.4);color:#fff}
+.btn.o:hover{border-color:#fff}
+footer{padding-block:40px 50px;color:var(--muted);font-size:14px}
+footer .in{display:flex;flex-wrap:wrap;gap:24px 30px;justify-content:space-between;align-items:center}
+footer .brand{color:var(--ink);font-size:18px}
+footer .fl{display:flex;gap:26px;flex-wrap:wrap}
+footer a:hover{color:var(--teal)}
+
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .7s,transform .7s}
+.reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.reveal{opacity:1;transform:none}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<header class="nav" id="nav">
+  <div class="wrap in">
+    <a href="/" class="brand" aria-label="Saans home">
+      <svg width="34" height="34" viewBox="0 0 34 34" role="img" aria-label="Saans logo"><rect width="34" height="34" rx="10" fill="#0B1B2B"/><path d="M7 13c3-3 5-3 8 0s5 3 8 0M7 20c3-3 5-3 8 0s5 3 8 0" fill="none" stroke="#5EEAD4" stroke-width="2.4" stroke-linecap="round"/></svg>
+      Saans
+    </a>
+    <nav class="links" aria-label="Main">
+      <a href="#how">How it works</a><a href="#audience">Who it's for</a><a href="#trust">Trust</a><a href="#faq">FAQ</a>
+      <a href="/app" class="btn p sm">Open the app</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="glow"></div>
+  <div class="wrap grid">
+    <div class="copy">
+      <span class="tag">Smog intelligence for families</span>
+      <h1>Breathe smarter this winter.</h1>
+      <p class="lead">Saans turns live air data into a daily plan for your household, and shows exactly what each choice changes in the air you breathe.</p>
+      <div class="cta">
+        <a href="/app" class="btn p">Build my plan</a>
+        <a href="#how" class="btn g">See how it works</a>
+      </div>
+      <div class="live" id="live"><i></i><span id="liveTxt">Using a sample reading</span></div>
+
+      <div class="sim">
+        <div class="top">
+          <label class="t" for="aqi">Outdoor AQI</label>
+          <div class="val"><b id="aqiNum">168</b><span id="aqiWord">Unhealthy</span></div>
+        </div>
+        <input id="aqi" type="range" min="20" max="350" value="168">
+        <div class="pills" role="group" aria-label="Protections">
+          <button class="pill" id="tWin" aria-pressed="false">Windows shut</button>
+          <button class="pill" id="tPur" aria-pressed="false">HEPA purifier</button>
+          <button class="pill" id="tMask" aria-pressed="false">Fitted N95</button>
+        </div>
+        <p class="note">Illustrative model. Drag the slider and switch protections on to see each layer change.</p>
+      </div>
+    </div>
+
+    <div class="viz">
+      <div class="stage">
+        <div class="stack" id="stack">
+          <div class="shadow"></div>
+        </div>
+      </div>
+      <div class="info" aria-live="polite">
+        <div class="h"><b id="iTitle">Outdoor air</b><span id="iMeta"></span></div>
+        <p id="iText"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="strip"><div class="wrap in">
+  <span class="s">Built on</span><span>Open-Meteo air quality</span><span>Copernicus CAMS models</span><span>Groq inference</span><span>US AQI scale</span>
+</div></div>
+
+<section>
+  <div class="wrap two reveal">
+    <div style="background:var(--bg2)">
+      <div class="eyebrow" style="color:#B45309">The problem</div>
+      <h3>Winter smog advice is generic, and nobody can see what it changes.</h3>
+      <p style="color:var(--muted)">One AQI number doesn't tell a parent when to take a child out, or show a family which habit matters most.</p>
+    </div>
+    <div style="background:var(--ink);color:#fff">
+      <div class="eyebrow" style="color:var(--mint)">The Saans approach</div>
+      <h3>Personal guidance, with the numbers to back it up.</h3>
+      <p style="color:#C6D3E1">AI writes the plan around your people, place and budget. A transparent model computes the impact, so every recommendation has a measurable result.</p>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap reveal">
+    <div class="eyebrow">How it works</div>
+    <h2>From live data to a plan you can act on today.</h2>
+    <div class="cards">
+      <div class="card"><div class="num">1</div><h4>Live local data</h4><p>AQI, PM2.5, weather and a 24-hour outlook for your neighbourhood, with the cleanest window highlighted.</p></div>
+      <div class="card"><div class="num">2</div><h4>Your household</h4><p>Tell Saans who is at home, how you commute, how you cook and what you can spend.</p></div>
+      <div class="card"><div class="num">3</div><h4>AI-written plan</h4><p>Routines, indoor-air fixes and sustainable swaps, each with a why and a direct impact.</p></div>
+      <div class="card"><div class="num">4</div><h4>Measured impact</h4><p>A transparent model shows the change in daily exposure, cigarette-equivalents and CO2.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="audience">
+  <div class="wrap reveal">
+    <div class="eyebrow">Who it's for</div>
+    <h2>One tool, built for every group that breathes.</h2>
+    <div class="tabs" role="tablist" aria-label="Audience" id="tabs"></div>
+    <div class="panel" role="tabpanel" id="panel" aria-live="polite">
+      <div class="l"><h3 id="pTitle"></h3><div id="pList"></div></div>
+      <div class="r"><div class="mock">
+        <div class="hd"><span id="mTitle"></span><span class="tg">Sample</span></div>
+        <div class="bar"><span id="m1" style="background:#E67E22;width:72%"></span></div>
+        <div class="bar"><span id="m2" style="background:var(--teal);width:38%"></span></div>
+        <div class="cap">Exposure before and after following the plan. Illustrative.</div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section id="impact">
+  <div class="wrap reveal">
+    <div class="eyebrow">What you get</div>
+    <h2>Everything you need, nothing you have to guess.</h2>
+    <div class="facts">
+      <div class="fact"><b>24 h</b><span>Forecast with the cleanest and worst three-hour windows</span></div>
+      <div class="fact"><b>5</b><span>Plan sections: routine, indoor air, swaps, community and care</span></div>
+      <div class="fact"><b>2</b><span>Languages for plans and chat: English and Hindi</span></div>
+      <div class="fact"><b>0</b><span>Invented numbers. Impact comes from a documented model</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="trust">
+  <div class="wrap reveal">
+    <div class="eyebrow">Trust and safety</div>
+    <h2>Built to be honest about what it knows.</h2>
+    <div class="trust">
+      <div class="card"><h4 style="margin-top:0">AI explains, a model computes</h4><p>Every number comes from a documented exposure model. The AI is told never to invent measurements.</p></div>
+      <div class="card"><h4 style="margin-top:0">Private by design</h4><p>API keys stay on the server, and household profiles stay on the user's own device.</p></div>
+      <div class="card"><h4 style="margin-top:0">Clear about its limits</h4><p>Guidance, not diagnosis. Warning signs always point people to medical care.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap reveal" style="max-width:860px">
+    <h2>Questions, answered.</h2>
+    <div style="margin-top:20px">
+      <details open><summary>Where does the air-quality data come from?</summary><p>Live and forecast data comes from Open-Meteo's air-quality service, which is based on Copernicus CAMS atmospheric models.</p></details>
+      <details><summary>Is the AI giving medical advice?</summary><p>No. Saans offers practical guidance and always directs people to medical care for warning signs such as chest pain or severe breathlessness.</p></details>
+      <details><summary>How are the impact numbers calculated?</summary><p>A transparent exposure model weights the hours you spend indoors, outdoors and commuting. Its assumptions are shown inside the app.</p></details>
+      <details><summary>Does it work in Hindi?</summary><p>Yes. Plans and chat replies can be generated in English or Hindi.</p></details>
+    </div>
+  </div>
+</section>
+
+<div class="final" id="start">
+  <div class="glow"></div>
+  <div class="wrap in">
+    <div><h2>Ready to make the air visible?</h2><p>Build a plan for your household in under a minute.</p></div>
+    <div class="cta" style="margin:0">
+      <a href="/app" class="btn m">Build my plan</a>
+      <a href="#how" class="btn o">See how it works</a>
+    </div>
+  </div>
+</div>
+</main>
+
+<footer><div class="wrap in">
+  <div class="brand">Saans</div>
+  <div class="fl"><a href="#how">How it works</a><a href="#trust">Trust</a><a href="#faq">FAQ</a><a href="/app">Open the app</a></div>
+  <div>Estimates are for planning, not medical advice.</div>
+</div></footer>
+
+<script>
+(function(){
+  var $=function(s){return document.querySelector(s)};
+  var st={aqi:168,win:false,pur:false,mask:false,sel:0};
+
+  var INFO=[
+    ['Outdoor air','What the monitor reads. Winter smog sits low and still, and is usually worst at night and in the early morning.'],
+    ['Your commute','Open transport takes the full dose. A fitted N95 changes this layer the most.'],
+    ['Inside your home','Shut windows and a HEPA purifier do the heavy lifting where you spend most of your hours.'],
+    ['What you breathe','Your time-weighted daily exposure. This is the number Saans helps you bring down.']
+  ];
+  function band(v){return v<=50?[46,204,113]:v<=100?[230,180,20]:v<=150?[230,126,34]:v<=200?[231,76,60]:[142,68,173]}
+  function rgba(v,a){var c=band(v);return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'}
+  function word(v){return v<=50?'Good':v<=100?'Moderate':v<=150?'Unhealthy for sensitive groups':v<=200?'Unhealthy':v<=300?'Very unhealthy':'Hazardous'}
+  function vals(){
+    var o=st.aqi,c=o*(st.mask?.45:.9),h=o*(st.win?.55:.8)*(st.pur?.45:1);
+    return [o,c,h,(o*2+c*2+h*20)/24];
+  }
+
+  /* build slabs + particles once */
+  var stack=$('#stack'),slabs=[],dots=[];
+  INFO.forEach(function(x,i){
+    var b=document.createElement('button');
+    b.className='slab';b.type='button';b.setAttribute('aria-label','Select layer: '+x[0]);
+    b.innerHTML='<span class="l">'+x[0]+'</span><span class="n">0</span>';
+    b.addEventListener('click',function(){st.sel=i;render()});
+    stack.appendChild(b);slabs.push(b);
+  });
+  for(var i=0;i<40;i++){
+    var d=document.createElement('div');d.className='dot';
+    var s=6+(i%3)*3;
+    d.style.cssText='left:'+((i*37)%86+8)+'%;top:'+((i*53)%80+14)+'%;width:'+s+'px;height:'+s+'px';
+    stack.appendChild(d);dots.push(d);
+  }
+
+  function render(){
+    var v=vals(),o=st.aqi;
+    $('#aqiNum').textContent=o;$('#aqiWord').textContent=word(o);
+    slabs.forEach(function(b,i){
+      var sel=st.sel===i;
+      b.style.transform='translateZ('+((3-i)*78+(sel?34:0))+'px)';
+      b.style.background=rgba(v[i],sel?.34:.2);
+      b.style.border='2px solid '+rgba(v[i],sel?.95:.55);
+      b.style.boxShadow='0 10px 0 -3px '+rgba(v[i],.5)+',0 36px 50px -24px rgba(11,27,43,.35)';
+      b.querySelector('.n').textContent=Math.round(v[i]);
+    });
+    var topZ=3*78+(st.sel===0?34:0)+12,count=Math.round(o/350*40);
+    dots.forEach(function(d,i){
+      d.style.transform='translateZ('+topZ+'px)';
+      d.style.background=rgba(o,.9);
+      d.style.opacity=i<count?1:0;
+    });
+    $('#iTitle').textContent=INFO[st.sel][0];
+    $('#iText').textContent=INFO[st.sel][1];
+    $('#iMeta').textContent='Index '+Math.round(v[st.sel])+' · '+word(v[st.sel]);
+    $('#tWin').setAttribute('aria-pressed',st.win);
+    $('#tPur').setAttribute('aria-pressed',st.pur);
+    $('#tMask').setAttribute('aria-pressed',st.mask);
+  }
+  $('#aqi').addEventListener('input',function(e){st.aqi=+e.target.value;render()});
+  $('#tWin').addEventListener('click',function(){st.win=!st.win;render()});
+  $('#tPur').addEventListener('click',function(){st.pur=!st.pur;render()});
+  $('#tMask').addEventListener('click',function(){st.mask=!st.mask;render()});
+  render();
+
+  /* seed with live data for Delhi when the backend is reachable */
+  fetch('/api/air?lat=28.6139&lon=77.209').then(function(r){return r.ok?r.json():Promise.reject()}).then(function(a){
+    if(a&&typeof a.aqi==='number'){
+      st.aqi=Math.max(20,Math.min(350,Math.round(a.aqi)));
+      $('#aqi').value=st.aqi;
+      $('#live').classList.add('on');
+      $('#liveTxt').textContent='Live reading: Delhi, US AQI '+Math.round(a.aqi);
+      render();
+    }
+  }).catch(function(){});
+
+  /* audience tabs */
+  var AUD=[
+    {n:'Families',t:'A daily plan for the people you love.',m:'Your household today',b:['Routines timed to the cleanest window of the day.','Care notes for children, elders and people with asthma.','Indoor-air fixes that match your budget.'],a:72,c:38},
+    {n:'Schools',t:'Keep students learning, and breathing, on smog days.',m:'School guidance today',b:['Outdoor-activity guidance by AQI band.','Parent notices in English and Hindi.','Simple records for administrators.'],a:64,c:30},
+    {n:'Housing societies',t:'One plan for the whole community.',m:'Society overview',b:['Group actions such as a no-burning pledge and a carpool rota.','A shared air view for residents.','WhatsApp-ready summaries.'],a:80,c:45},
+    {n:'Cities and NGOs',t:'Ward-level visibility and action.',m:'Ward overview',b:['Zone comparisons and trend views.','Resident advisories at scale.','Reports for programmes and funders.'],a:85,c:50}
+  ],tabs=$('#tabs'),tabEls=[];
+  AUD.forEach(function(x,i){
+    var b=document.createElement('button');b.className='tab';b.type='button';b.setAttribute('role','tab');b.textContent=x.n;
+    b.addEventListener('click',function(){pick(i)});
+    tabs.appendChild(b);tabEls.push(b);
+  });
+  function pick(i){
+    var x=AUD[i];
+    tabEls.forEach(function(b,j){b.setAttribute('aria-selected',i===j)});
+    $('#pTitle').textContent=x.t;$('#mTitle').textContent=x.m;
+    $('#pList').innerHTML=x.b.map(function(t){return '<div class="bl"><i></i><span>'+t+'</span></div>'}).join('');
+    $('#m1').style.width=x.a+'%';$('#m2').style.width=x.c+'%';
+  }
+  pick(0);
+
+  /* nav border + reveal on scroll */
+  var nav=$('#nav');
+  addEventListener('scroll',function(){nav.classList.toggle('scrolled',scrollY>8)},{passive:true});
+  var els=document.querySelectorAll('.reveal');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.08});
+    els.forEach(function(e){io.observe(e)});
+  }else{els.forEach(function(e){e.classList.add('in')})}
+})();
+</script>
+</body>
+</html>
