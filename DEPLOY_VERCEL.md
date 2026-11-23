@@ -2,7 +2,7 @@
 
 ## One-time setup
 1. Put this whole folder in a GitHub repo (the `.gitignore` keeps `.env` out).
-   `api/index.py` and `vercel.json` must be at the repo ROOT, next to `app.py`.
+   `app.py` must be at the repo ROOT (Vercel auto-detects Flask from it). No `vercel.json` or `api/` folder is needed.
 2. Vercel dashboard -> Add New -> Project -> import the repo.
    - Framework Preset: **Other**
    - Root Directory: the folder that contains `vercel.json`
