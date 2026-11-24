@@ -14,6 +14,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: pip install -r requirements.txt -r requirements-dev.txt ruff
-      - run: ruff check app.py tests --select E,F,W,B,UP --ignore E501,UP037
-      - run: pytest --cov=app --cov-report=term-missing --cov-fail-under=90
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check .
+      - run: mypy saans app.py
+      - run: pytest --cov --cov-fail-under=95

@@ -1,7 +1,10 @@
 """HTTP-level tests: routes, validation, error handling, fallbacks and security headers."""
 import json
 
-import app as saans
+import requests
+
+from saans import llm, upstream
+from saans.config import settings
 
 PROFILE = {"household": ["children"], "mode": "car", "commute_km": 10, "outdoor_hours": 2,
            "windows": "open", "purifier_owned": False, "budget": "low", "transit": True}
@@ -45,7 +48,7 @@ def test_api_is_never_cached(client):
 
 
 def test_health_never_leaks_the_key(client, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "gsk_super_secret")
+    monkeypatch.setattr(settings, "groq_key", "gsk_super_secret")
     body = client.get("/api/health").get_data(as_text=True)
     assert "gsk_super_secret" not in body and json.loads(body)["groq"] is True
 
@@ -69,9 +72,9 @@ def test_geocode_returns_places_and_caches(client, fake_upstream):
 
 def test_geocode_upstream_failure_is_502(client, monkeypatch):
     def boom(*a, **k):
-        raise saans.requests.ConnectionError("down")
+        raise requests.ConnectionError("down")
 
-    monkeypatch.setattr(saans._http, "get", boom)
+    monkeypatch.setattr(upstream.session, "get", boom)
     r = client.get("/api/geocode?q=Delhi")
     assert r.status_code == 502 and r.get_json()["results"] == []
 
@@ -90,9 +93,9 @@ def test_air_ok(client, fake_upstream):
 
 def test_air_upstream_failure_is_502(client, monkeypatch):
     def boom(*a, **k):
-        raise saans.requests.Timeout("slow")
+        raise requests.Timeout("slow")
 
-    monkeypatch.setattr(saans._http, "get", boom)
+    monkeypatch.setattr(upstream.session, "get", boom)
     assert client.get("/api/air?lat=1&lon=1").status_code == 502
 
 
@@ -111,7 +114,7 @@ def test_impact_rejects_bad_input(client):
 
 # ---- plan ------------------------------------------------------------------------------
 def test_plan_falls_back_without_key(client, air_context, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "")
+    monkeypatch.setattr(settings, "groq_key", "")
     r = post(client, "/api/plan", {"context": air_context, "profile": PROFILE})
     d = r.get_json()
     assert r.status_code == 200 and d["source"] == "fallback" and d["model"] is None
@@ -120,33 +123,33 @@ def test_plan_falls_back_without_key(client, air_context, monkeypatch):
 
 
 def test_plan_uses_groq_when_available(client, air_context, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "k")
-    monkeypatch.setattr(saans, "groq_chat", lambda *a, **k: json.dumps(
+    monkeypatch.setattr(settings, "groq_key", "k")
+    monkeypatch.setattr(llm, "groq_chat", lambda *a, **k: json.dumps(
         {"headline": "AI plan", "routine": [{"title": "t", "when": "evening"}]}))
     d = post(client, "/api/plan", {"context": air_context, "profile": PROFILE, "lang": "hi"}).get_json()
-    assert d["source"] == "groq" and d["plan"]["headline"] == "AI plan" and d["model"] == saans.GROQ_MODEL
+    assert d["source"] == "groq" and d["plan"]["headline"] == "AI plan" and d["model"] == settings.groq_model
 
 
 def test_plan_recovers_from_bad_llm_output(client, air_context, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "k")
-    monkeypatch.setattr(saans, "groq_chat", lambda *a, **k: "this is not json")
+    monkeypatch.setattr(settings, "groq_key", "k")
+    monkeypatch.setattr(llm, "groq_chat", lambda *a, **k: "this is not json")
     d = post(client, "/api/plan", {"context": air_context, "profile": PROFILE}).get_json()
     assert d["source"] == "fallback" and d["plan"]["routine"] and d["error"]
 
 
 def test_plan_recovers_from_llm_outage(client, air_context, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "k")
+    monkeypatch.setattr(settings, "groq_key", "k")
 
     def down(*a, **k):
-        raise RuntimeError("Groq API 503")
+        raise llm.LLMError("Groq API 503")
 
-    monkeypatch.setattr(saans, "groq_chat", down)
+    monkeypatch.setattr(llm, "groq_chat", down)
     d = post(client, "/api/plan", {"context": air_context, "profile": PROFILE}).get_json()
     assert d["source"] == "fallback" and "503" in d["error"]
 
 
 def test_plan_tolerates_malformed_profile(client, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "")
+    monkeypatch.setattr(settings, "groq_key", "")
     r = post(client, "/api/plan", {"context": "x", "profile": {"household": "children", "commute_km": 5}})
     assert r.status_code == 200
     assert post(client, "/api/plan", {"profile": {"commute_km": "far"}}).status_code == 400
@@ -159,20 +162,20 @@ def test_chat_requires_a_message(client):
 
 
 def test_chat_without_key_explains_setup(client, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "")
+    monkeypatch.setattr(settings, "groq_key", "")
     d = post(client, "/api/chat", {"messages": [{"role": "user", "content": "hi"}]}).get_json()
     assert d["source"] == "fallback" and "GROQ_API_KEY" in d["reply"]
 
 
 def test_chat_passes_context_and_trims_history(client, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "k")
+    monkeypatch.setattr(settings, "groq_key", "k")
     seen = {}
 
     def fake(messages, **kw):
         seen["messages"] = messages
         return "Wear an N95."
 
-    monkeypatch.setattr(saans, "groq_chat", fake)
+    monkeypatch.setattr(llm, "groq_chat", fake)
     msgs = [{"role": "user", "content": f"q{i}"} for i in range(30)]
     d = post(client, "/api/chat", {"messages": msgs, "lang": "hi", "context": {"place": "Delhi"}}).get_json()
     assert d["reply"] == "Wear an N95." and d["source"] == "groq"
@@ -181,18 +184,18 @@ def test_chat_passes_context_and_trims_history(client, monkeypatch):
 
 
 def test_chat_upstream_failure_is_502(client, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "k")
+    monkeypatch.setattr(settings, "groq_key", "k")
 
     def down(*a, **k):
-        raise RuntimeError("boom")
+        raise llm.LLMError("boom")
 
-    monkeypatch.setattr(saans, "groq_chat", down)
+    monkeypatch.setattr(llm, "groq_chat", down)
     assert post(client, "/api/chat", {"messages": [{"role": "user", "content": "hi"}]}).status_code == 502
 
 
 # ---- limits ----------------------------------------------------------------------------
 def test_rate_limit_kicks_in_with_retry_after(client, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "")
+    monkeypatch.setattr(settings, "groq_key", "")
     codes = [post(client, "/api/chat", {"messages": [{"role": "user", "content": "hi"}]}).status_code
              for _ in range(31)]
     assert codes[:30] == [200] * 30 and codes[30] == 429
@@ -201,7 +204,7 @@ def test_rate_limit_kicks_in_with_retry_after(client, monkeypatch):
 
 
 def test_rate_limit_is_per_client(client, monkeypatch):
-    monkeypatch.setattr(saans, "GROQ_KEY", "")
+    monkeypatch.setattr(settings, "groq_key", "")
     for _ in range(30):
         post(client, "/api/chat", {"messages": [{"role": "user", "content": "hi"}]})
     other = post(client, "/api/chat", {"messages": [{"role": "user", "content": "hi"}]},

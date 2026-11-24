@@ -10,9 +10,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#0B1B2B; --muted:#44566A; --soft:#6B7C90; --line:#E3EAF2; --bg:#fff; --bg2:#F4F8FB;
-  --teal:#0E8F82; --teal-d:#0A7468; --mint:#5EEAD4; --mint-bg:#E6F6F3;
-  --accent:#0E8F82; --accent2:#0A7468; --warn:#B45309; --aqi:#e67e22; --r:20px;
+  --ink:#0B1B2B; --muted:#44566A; --soft:#56677B; --line:#E3EAF2; --bg:#fff; --bg2:#F4F8FB;
+  --teal:#0A7468; --teal-d:#085C52; --mint:#5EEAD4; --mint-bg:#E6F6F3;
+  --accent:#0A7468; --accent2:#085C52; --warn:#B45309; --aqi:#e67e22; --r:20px;
 }
 *{box-sizing:border-box;margin:0}
 html{scroll-behavior:smooth}
@@ -67,9 +67,9 @@ textarea{resize:vertical}
 .gauge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--bg2);border-radius:22px;padding:24px}
 .ring{width:190px;height:190px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--aqi) 0%,#DDE5ED 0)}
 .ring>div{width:156px;height:156px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px var(--line)}
-.ring b{font-size:3rem;line-height:1;color:var(--aqi);font-weight:800;letter-spacing:-.04em}
+.ring b{font-size:3rem;line-height:1;color:var(--aqi-text,var(--aqi));font-weight:800;letter-spacing:-.04em}
 .ring span{font-size:.7rem;color:var(--soft);margin-top:4px;letter-spacing:1px;font-weight:700}
-.cat{font-weight:800;color:var(--aqi);text-align:center}
+.cat{font-weight:800;color:var(--aqi-text,var(--aqi));text-align:center}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px;width:100%}
 .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 6px;text-align:center}
 .stat b{display:block;font-size:1.05rem;font-weight:800}.stat small{color:var(--soft);font-size:.7rem}
@@ -99,7 +99,7 @@ textarea{resize:vertical}
 .items{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(290px,1fr))}
 .item{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;transition:transform .2s,box-shadow .2s}
 .item:hover{transform:translateY(-3px);box-shadow:0 24px 40px -28px rgba(11,27,43,.4)}
-.item h4{font-size:1rem;font-weight:800;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.item h3{font-size:1rem;font-weight:800;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
 .item p{font-size:.9rem;color:var(--muted)}
 .cost{font-size:.7rem;font-weight:700;background:var(--bg2);border:1px solid var(--line);padding:3px 9px;border-radius:999px;color:var(--soft);white-space:nowrap}
 .why{margin-top:10px;font-size:.82rem;color:var(--soft)}
@@ -231,9 +231,9 @@ main:focus{outline:none}
   </div>
   <div class="two">
     <div><div class="label">Commute distance (one way)</div>
-      <div class="range"><input type="range" id="km" min="0" max="40" value="8"><output id="kmo">8 km</output></div></div>
+      <div class="range"><input type="range" id="km" aria-label="Commute distance, one way, in kilometres" min="0" max="40" value="8"><output id="kmo">8 km</output></div></div>
     <div><div class="label">Hours outdoors per day (excl. commute)</div>
-      <div class="range"><input type="range" id="oh" min="0" max="10" step="0.5" value="2"><output id="oho">2 h</output></div></div>
+      <div class="range"><input type="range" id="oh" aria-label="Hours outdoors per day, excluding commute" min="0" max="10" step="0.5" value="2"><output id="oho">2 h</output></div></div>
   </div>
   <div class="two">
     <div><div class="label">Windows at home are usually…</div>
@@ -374,6 +374,7 @@ async function loadAir(){
 }
 function renderAir(a){
   document.documentElement.style.setProperty('--aqi',a.color);
+  document.documentElement.style.setProperty('--aqi-text',a.text_color||a.color);
   $('#aqi').textContent=a.aqi??'–'; $('#cat').textContent=a.category;
   $('#ring').style.background=`conic-gradient(${a.color} ${Math.min(a.aqi||0,300)/3}%,#DDE5ED 0)`;
   $('#pm25').textContent=a.pm25??'–'; $('#pm10').textContent=a.pm10??'–';
@@ -444,7 +445,7 @@ $('#gen').onclick=async()=>{
   btn.disabled=false; btn.textContent='✨ Generate my smog plan';
 };
 function itemHTML(i){
-  return `<div class="item"><h4><span>${esc(i.title)}</span>${i.cost?`<span class="cost">${esc(i.cost).replace(/Rs/g,'₹')}</span>`:''}</h4>
+  return `<div class="item"><h3><span>${esc(i.title)}</span>${i.cost?`<span class="cost">${esc(i.cost).replace(/Rs/g,'₹')}</span>`:''}</h3>
     <p>${esc(i.detail)}</p>${i.why?`<div class="why"><b>Why:</b> ${esc(i.why)}</div>`:''}${i.impact?`<div class="impact">🎯 ${esc(i.impact)}</div>`:''}</div>`;
 }
 function renderTab(){
@@ -455,9 +456,9 @@ function renderTab(){
       h+=`<div class="when">${{morning:'🌅',afternoon:'☀️',evening:'🌆',night:'🌙'}[w]} ${w}</div>`+L.map(itemHTML).join('');
     });
   } else if(curTab==='care'){
-    h+=p.care.map(c=>`<div class="item"><h4>${esc(c.title)}</h4><p>${esc(c.detail)}</p></div>`).join('');
-    h+=`<div class="item" style="grid-column:1/-1;border-color:#F4C2BC;background:#FDF5F4"><h4>🚨 Seek medical help if…</h4><ul class="warns">${p.warning_signs.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
-    if(p.myth?.myth) h+=`<div class="item" style="grid-column:1/-1"><h4>💡 Myth buster</h4><p><b>Myth:</b> ${esc(p.myth.myth)}<br><b>Truth:</b> ${esc(p.myth.truth)}</p></div>`;
+    h+=p.care.map(c=>`<div class="item"><h3>${esc(c.title)}</h3><p>${esc(c.detail)}</p></div>`).join('');
+    h+=`<div class="item" style="grid-column:1/-1;border-color:#F4C2BC;background:#FDF5F4"><h3>🚨 Seek medical help if…</h3><ul class="warns">${p.warning_signs.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
+    if(p.myth?.myth) h+=`<div class="item" style="grid-column:1/-1"><h3>💡 Myth buster</h3><p><b>Myth:</b> ${esc(p.myth.myth)}<br><b>Truth:</b> ${esc(p.myth.truth)}</p></div>`;
   } else h+=(p[curTab]||[]).map(itemHTML).join('');
   $('#pBody').innerHTML=h+'</div>';
 }

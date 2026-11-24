@@ -4,11 +4,14 @@ import os
 import sys
 
 import pytest
+import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.pop("GROQ_API_KEY", None)
 
-import app as saans  # noqa: E402
+from app import app as flask_app  # noqa: E402
+from saans import aqi, cache, security, upstream  # noqa: E402
+from saans.config import settings  # noqa: E402
 
 
 class FakeResponse:
@@ -17,7 +20,7 @@ class FakeResponse:
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            raise saans.requests.HTTPError(f"{self.status_code}")
+            raise requests.HTTPError(f"{self.status_code}")
 
     def json(self):
         return self._payload
@@ -34,17 +37,18 @@ def sample_air_payload(base_pm=135.0):
 
 
 @pytest.fixture(autouse=True)
-def _clean_state():
-    saans._hits.clear()
-    saans.AIR_CACHE.clear()
-    saans.GEO_CACHE.clear()
+def _clean_state(monkeypatch):
+    security.reset_rate_limits()
+    cache.AIR_CACHE.clear()
+    cache.GEO_CACHE.clear()
+    monkeypatch.setattr(settings, "groq_key", "")   # every test starts in offline mode
     yield
 
 
 @pytest.fixture
 def client():
-    saans.app.config.update(TESTING=True)
-    return saans.app.test_client()
+    flask_app.config.update(TESTING=True)
+    return flask_app.test_client()
 
 
 @pytest.fixture
@@ -63,10 +67,10 @@ def fake_upstream(monkeypatch):
         calls["wx"] += 1
         return FakeResponse({"current": {"temperature_2m": 11, "relative_humidity_2m": 68, "wind_speed_10m": 3}})
 
-    monkeypatch.setattr(saans._http, "get", fake_get)
+    monkeypatch.setattr(upstream.session, "get", fake_get)
     return calls
 
 
 @pytest.fixture
 def air_context(fake_upstream):
-    return saans.fetch_air(28.65, 77.23)
+    return aqi.fetch_air(28.65, 77.23)

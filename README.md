@@ -28,29 +28,32 @@ No Groq key? The app still works in **offline smart-rules mode**, so a demo neve
 
 ## Why it's trustworthy (judges love this)
 
-- **LLM explains, a model computes.** All numbers (exposure, % reduction, CO₂) come from a deterministic, documented engine (`compute_impact` in `app.py`) - the LLM is told not to invent measurements.
+- **LLM explains, a model computes.** All numbers (exposure, % reduction, CO₂) come from a deterministic, documented engine (`compute_impact` in `saans/impact.py`) - the LLM is told not to invent measurements.
 - **Safety guard-rails:** not a doctor, no dosages, red-flag symptoms → seek care, no ozone generators/ionizers, never burn anything indoors.
 - **Graceful degradation:** if Groq/network fails → rule-based plan, clearly labelled.
 - **Privacy:** key stays server-side; profile stored only in the browser's localStorage.
 
 ## Quality, security & performance
 
-- **Tests:** 69 automated tests (pytest, ~97% coverage of `app.py`) - the impact model, AQI banding, forecast windows, plan normalisation, fallbacks, every API route, validation, rate limiting and security headers. Upstream APIs are faked, so the suite runs offline in under a second.
+- **Structure:** a small Flask package (`saans/`), one concern per module: `aqi`, `impact`, `llm`, `fallback`, `routes`, `security`, `pages`, `config`. `app.py` is a thin entry point (`app:app`), so Vercel and gunicorn work unchanged.
+- **Tests:** 106 automated tests, ~98% line+branch coverage. They cover the impact model, AQI banding, plan normalisation and fallbacks, every API route, validation, rate limiting, security headers, CSP hashes and static accessibility rules (heading order, labels, landmarks, colour contrast). Upstream APIs are faked, so the suite runs offline in under a second.
   ```bash
   pip install -r requirements-dev.txt
-  pytest --cov=app --cov-report=term-missing
+  pytest --cov     # tests + coverage
+  ruff check .     # lint (incl. complexity limit)
+  mypy saans app.py
   ```
-  GitHub Actions (`.github/workflows/ci.yml`) runs lint + tests on every push.
-- **Security:** strict CSP and security headers, request-size limit, per-route rate limits, strict input validation and clamping, JSON-only API errors, secrets only on the server (never returned by `/api/health`).
+  GitHub Actions (`.github/workflows/ci.yml`) runs lint, type-check and tests on every push.
+- **Security:** CSP that allows only the pages' own inline script/style blocks by SHA-256 hash (no `unsafe-inline` for scripts, no `unsafe-eval`), plus COOP, nosniff, frame and referrer policies. 64 KB body limit, per-route rate limits, strict input validation and clamping, JSON-only API errors. The Groq key stays on the server and is never returned by `/api/health`.
 - **Efficiency:** pooled HTTP session, parallel weather + air fetch, 10-minute air and 1-hour geocode caches, HTML read once with ETag/304 revalidation, gzip on text/JSON.
-- **Accessibility:** skip link, landmarks, labelled controls, live regions for results and errors, `aria-pressed` on toggles, reduced-motion support.
+- **Accessibility:** audited with axe-core (WCAG 2.1 A/AA + best practices): 0 violations on the landing page and on the app, including after a plan is generated. Skip link, landmarks, labelled controls, live regions, AA colour contrast, ordered headings, `aria-pressed` toggles, reduced-motion support.
 
 ## Architecture
 
 ```
 Browser (index.html)
    │  /api/geocode  /api/air  /api/impact  /api/plan  /api/chat
-Flask (app.py)
+Flask (saans/ package, entry: app.py)
    ├─ Open-Meteo Air Quality + Forecast + Geocoding  → live AQI, forecast, clean windows
    ├─ TTL cache + pooled session + security middleware
    ├─ Impact engine (pure Python)                    → exposure, cigarettes, CO₂

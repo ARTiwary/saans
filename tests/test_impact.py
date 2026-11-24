@@ -1,7 +1,7 @@
 """The deterministic exposure/impact model: numbers must be sane, monotonic and validated."""
 import pytest
 
-import app as saans
+from saans.impact import compute_impact
 
 BASE = {"pm25": 150, "best_pm25": 90, "outdoor_hours": 2, "commute_km": 8, "mode": "two_wheeler"}
 
@@ -9,7 +9,7 @@ BASE = {"pm25": 150, "best_pm25": 90, "outdoor_hours": 2, "commute_km": 8, "mode
 def impact(**over):
     d = dict(BASE)
     d.update(over)
-    return saans.compute_impact(d)
+    return compute_impact(d)
 
 
 def test_no_scenario_means_no_change():
