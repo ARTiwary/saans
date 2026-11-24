@@ -135,11 +135,16 @@ details{margin-top:14px;font-size:.8rem;color:var(--soft)}details summary{cursor
 footer{color:var(--soft);font-size:.8rem;text-align:center;padding:30px 0 50px;border-top:1px solid var(--line);margin-top:30px}
 .err{color:#C0392B;font-size:.85rem;margin-top:8px}
 .hidden{display:none!important}
+.skip{position:absolute;left:-999px;top:8px;background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;z-index:100;text-decoration:none}
+.skip:focus{left:12px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+main:focus{outline:none}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{header,.intro,.chat,#chatCard,#profileCard{display:none}body{background:#fff;color:#000}}
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to main content</a>
 <div class="wrap">
 <header class="top">
   <a href="/" class="brand" aria-label="Saans home"><svg width="34" height="34" viewBox="0 0 34 34" role="img" aria-label="Saans logo"><rect width="34" height="34" rx="10" fill="#0B1B2B"/><path d="M7 13c3-3 5-3 8 0s5 3 8 0M7 20c3-3 5-3 8 0s5 3 8 0" fill="none" stroke="#5EEAD4" stroke-width="2.4" stroke-linecap="round"/></svg>Saans</a>
@@ -153,6 +158,7 @@ footer{color:var(--soft);font-size:.8rem;text-align:center;padding:30px 0 50px;b
   </div>
 </header>
 
+<main id="main" tabindex="-1">
 <div class="intro">
   <span class="tag">Smog intelligence for families</span>
   <h1>Your winter air plan.</h1>
@@ -166,20 +172,20 @@ footer{color:var(--soft);font-size:.8rem;text-align:center;padding:30px 0 50px;b
       <div class="eyebrow">Step 1</div><h2>Where are you?</h2>
       <div class="sub">Live air quality for your neighbourhood, powered by open data.</div>
       <div class="search">
-        <input id="q" placeholder="Search city or area (e.g. Delhi, Lucknow, Patna, Ranchi)…" autocomplete="off">
+        <input id="q" type="search" aria-label="Search city or area" placeholder="Search city or area (e.g. Delhi, Lucknow, Patna, Ranchi)…" autocomplete="off">
         <div class="results hidden" id="results"></div>
       </div>
       <div class="row">
         <button class="btn ghost" id="geo">📍 Use my location</button>
         <button class="btn ghost" id="refresh">↻ Refresh</button>
       </div>
-      <div class="place" id="place">Loading…</div>
+      <div class="place" id="place" role="status" aria-live="polite">Loading…</div>
       <div class="sub" id="updated"></div>
-      <div class="advice" id="advice">…</div>
-      <div class="err" id="airErr"></div>
+      <div class="advice" id="advice" role="status">…</div>
+      <div class="err" id="airErr" role="alert"></div>
     </div>
     <div class="gauge">
-      <div class="ring" id="ring"><div><b id="aqi">–</b><span>US AQI</span></div></div>
+      <div class="ring" id="ring" role="img" aria-label="Current US air quality index"><div><b id="aqi">–</b><span>US AQI</span></div></div>
       <div class="cat" id="cat">–</div>
       <div class="stats">
         <div class="stat"><b id="pm25">–</b><small>PM2.5 µg/m³</small></div>
@@ -240,14 +246,14 @@ footer{color:var(--soft);font-size:.8rem;text-align:center;padding:30px 0 50px;b
       <div class="chips" data-key="budget"><button data-v="none">₹0 - free only</button><button data-v="low">Low (&lt;₹2k)</button><button data-v="medium">Medium (₹2-15k)</button></div></div>
   </div>
   <div class="label">Anything else? (optional)</div>
-  <textarea id="notes" rows="2" class="txt" placeholder="e.g. Child with dust allergy, we live near a main road, baby is 8 months old…"></textarea>
+  <textarea id="notes" rows="2" aria-label="Anything else about your household (optional)" class="txt" placeholder="e.g. Child with dust allergy, we live near a main road, baby is 8 months old…"></textarea>
   <div class="row"><button class="btn" id="gen">✨ Generate my smog plan</button></div>
-  <div class="err" id="planErr"></div>
+  <div class="err" id="planErr" role="alert"></div>
 </section>
 
 <!-- PLAN -->
 <section class="card hidden" id="planCard">
-  <div class="headline" id="pHead"></div>
+  <div class="headline" id="pHead" aria-live="polite"></div>
   <div class="sub" id="pRisk" style="font-size:.98rem"></div>
   <div class="note hidden" id="pNote"></div>
   <div class="tabs" id="tabs"></div>
@@ -269,7 +275,7 @@ footer{color:var(--soft);font-size:.8rem;text-align:center;padding:30px 0 50px;b
     <label class="sw"><input type="checkbox" id="s_mask"> Wear a fitted N95 outdoors</label>
     <label class="sw"><input type="checkbox" id="s_shift"> Go out only in the clean window</label>
     <label class="sw" style="grid-column:1/-1">🚇 Switch commute to
-      <select id="s_mode" class="txt" style="width:auto;padding:6px 10px">
+      <select id="s_mode" aria-label="Switch commute to" class="txt" style="width:auto;padding:6px 10px">
         <option value="">(no change)</option><option value="metro">Metro</option><option value="bus">Bus</option>
         <option value="cycle">Cycle</option><option value="walk">Walk</option><option value="wfh">Work from home</option></select></label>
   </div>
@@ -298,10 +304,12 @@ footer{color:var(--soft);font-size:.8rem;text-align:center;padding:30px 0 50px;b
     <button>Do cloth masks work against smog?</button>
     <button>Cheapest way to clean my bedroom air?</button>
   </div>
-  <div class="chat" id="chat"><div class="msg a">Hi! I'm Saans 👋 Pick a location above, then ask me about today's air - routines, masks, purifiers, travel, school runs…</div></div>
-  <div class="chatbar"><input id="ci" placeholder="Type your question…"><button class="btn" id="cs">Send</button></div>
-  <div class="err" id="chatErr"></div>
+  <div class="chat" id="chat" role="log" aria-live="polite" aria-label="Conversation with Saans"><div class="msg a">Hi! I'm Saans 👋 Pick a location above, then ask me about today's air - routines, masks, purifiers, travel, school runs…</div></div>
+  <div class="chatbar"><input id="ci" aria-label="Ask Saans a question" maxlength="500" placeholder="Type your question…"><button class="btn" id="cs">Send</button></div>
+  <div class="err" id="chatErr" role="alert"></div>
 </section>
+
+</main>
 
 <footer>
   Data: Open-Meteo Air Quality (CAMS) · US AQI scale · AI: Groq · Estimates are for planning, not medical advice.<br>
@@ -456,7 +464,7 @@ function renderTab(){
 function renderPlan(r){
   const p=r.plan; $('#pHead').textContent=p.headline; $('#pRisk').textContent=p.risk_summary;
   const n=$('#pNote'); if(r.source!=='groq'){ n.classList.remove('hidden'); n.textContent='Showing the built-in offline plan'+(r.error?` (${r.error})`:'')+'. Add a valid GROQ_API_KEY for fully personalised AI plans.'; } else n.classList.add('hidden');
-  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button data-k="${k}" class="${k===curTab?'on':''}">${l}</button>`).join('');
+  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button data-k="${k}" aria-pressed="${k===curTab}" class="${k===curTab?'on':''}">${l}</button>`).join('');
   $('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{curTab=b.dataset.k;renderPlan(state.plan)});
   $('#pSrc').textContent=r.source==='groq'?`Generated by Groq · ${r.model} · using live AQI ${state.air.aqi} and your profile`:'Rule-based plan using live AQI and your profile';
   renderTab();

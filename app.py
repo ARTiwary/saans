@@ -4,12 +4,20 @@ severe winter smog and urban air pollution.
 Stack: Flask + Groq (LLM) + Open-Meteo (live air quality, no API key needed).
 The Groq key lives only on the server (GROQ_API_KEY env var).
 """
+from __future__ import annotations
+
+import gzip
+import hashlib
 import json
 import os
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, abort, jsonify, request
+from requests.adapters import HTTPAdapter
+from werkzeug.exceptions import HTTPException
 
 try:
     from dotenv import load_dotenv
@@ -28,24 +36,146 @@ WX_URL = "https://api.open-meteo.com/v1/forecast"
 GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024  # request bodies are tiny; reject anything bigger
+
+# One pooled HTTP session: reuses TLS connections to Open-Meteo and Groq (faster than a new
+# connection per call).
+_http = requests.Session()
+_http.mount("https://", HTTPAdapter(pool_connections=4, pool_maxsize=16))
+
 
 # ----------------------------------------------------------------------------
-# tiny in-memory rate limiter (protects your Groq quota during a live demo)
+# Small thread-safe TTL cache (cuts upstream calls; air data only changes hourly)
 # ----------------------------------------------------------------------------
-_hits = {}
+class TTLCache:
+    """Minimal in-memory cache with per-entry expiry and a size cap."""
+
+    def __init__(self, ttl: float, maxsize: int = 256):
+        self.ttl, self.maxsize = ttl, maxsize
+        self._data: dict = {}
+        self._lock = threading.Lock()
+
+    def get(self, key):
+        with self._lock:
+            hit = self._data.get(key)
+            if hit and hit[0] > time.time():
+                return hit[1]
+            self._data.pop(key, None)
+            return None
+
+    def set(self, key, value):
+        with self._lock:
+            if len(self._data) >= self.maxsize:
+                oldest = min(self._data, key=lambda k: self._data[k][0])
+                self._data.pop(oldest, None)
+            self._data[key] = (time.time() + self.ttl, value)
+
+    def clear(self):
+        with self._lock:
+            self._data.clear()
+
+
+AIR_CACHE = TTLCache(ttl=600)      # 10 min: Open-Meteo updates hourly
+GEO_CACHE = TTLCache(ttl=3600)     # place names basically never change
+
+# ----------------------------------------------------------------------------
+# In-memory rate limiter (protects the Groq quota and the free upstream APIs)
+# path -> (max requests, window seconds) per client IP
+# ----------------------------------------------------------------------------
+RATE_LIMITS = {
+    "/api/plan": (30, 60), "/api/chat": (30, 60),
+    "/api/air": (120, 60), "/api/geocode": (120, 60), "/api/impact": (120, 60),
+}
+_hits: dict = {}
+_hits_lock = threading.Lock()
+
+
+def _client_ip() -> str:
+    return (request.headers.get("X-Forwarded-For") or request.remote_addr or "?").split(",")[0].strip()
 
 
 @app.before_request
 def _rate_limit():
-    if request.path in ("/api/plan", "/api/chat"):
-        ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "?").split(",")[0]
-        now = time.time()
-        q = [t for t in _hits.get(ip, []) if now - t < 60]
-        if len(q) >= 30:
-            _hits[ip] = q
-            return jsonify(error="Too many requests - please wait a minute."), 429
+    limit = RATE_LIMITS.get(request.path)
+    if not limit:
+        return None
+    max_hits, window = limit
+    key, now = (_client_ip(), request.path), time.time()
+    with _hits_lock:
+        if len(_hits) > 5000:  # drop stale clients so memory cannot grow without bound
+            for k in [k for k, v in _hits.items() if not v or now - v[-1] > window]:
+                del _hits[k]
+        q = [t for t in _hits.get(key, []) if now - t < window]
+        if len(q) >= max_hits:
+            _hits[key] = q
+            resp = jsonify(error="Too many requests - please wait a minute.")
+            resp.status_code = 429
+            resp.headers["Retry-After"] = str(window)
+            return resp
         q.append(now)
-        _hits[ip] = q
+        _hits[key] = q
+    return None
+
+
+# ----------------------------------------------------------------------------
+# Security headers, compression, JSON errors
+# ----------------------------------------------------------------------------
+CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' "
+       "https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; "
+       "connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; object-src 'none'")
+
+
+@app.after_request
+def _finish(resp: Response) -> Response:
+    h = resp.headers
+    h.setdefault("Content-Security-Policy", CSP)
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "SAMEORIGIN")
+    h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    h.setdefault("Permissions-Policy", "geolocation=(self), camera=(), microphone=()")
+    if request.path.startswith("/api/"):
+        h["Cache-Control"] = "no-store"
+    # gzip text/JSON responses (HTML pages are ~30 KB, forecasts ~10 KB)
+    if (resp.status_code == 200 and not resp.direct_passthrough and "Content-Encoding" not in h
+            and "gzip" in request.headers.get("Accept-Encoding", "")
+            and (resp.mimetype.startswith("text/") or resp.mimetype == "application/json")):
+        data = resp.get_data()
+        if len(data) > 1024:
+            resp.set_data(gzip.compress(data, compresslevel=6))
+            h["Content-Encoding"] = "gzip"
+            h["Content-Length"] = str(len(resp.get_data()))
+            h.add("Vary", "Accept-Encoding")
+    return resp
+
+
+@app.errorhandler(HTTPException)
+def _json_errors(e: HTTPException):
+    """API clients always get JSON errors, never HTML error pages."""
+    if request.path.startswith("/api/"):
+        return jsonify(error=e.description or e.name), e.code
+    return e
+
+
+def _body() -> dict:
+    """Parsed JSON object body, or a clean 400."""
+    data = request.get_json(force=True, silent=True)
+    if not isinstance(data, dict):
+        abort(400, "A JSON object body is required.")
+    return data
+
+
+def _num(d: dict, key: str, default: float, lo: float, hi: float) -> float:
+    """Read a numeric field, falling back to a default and clamping to [lo, hi]."""
+    v = d.get(key)
+    if v in (None, ""):
+        return default
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        raise ValueError(f"'{key}' must be a number") from None
+    if v != v:  # NaN
+        raise ValueError(f"'{key}' must be a number")
+    return max(lo, min(hi, v))
 
 
 # ----------------------------------------------------------------------------
@@ -70,7 +200,8 @@ ADVICE = [
 ]
 
 
-def band(aqi):
+def band(aqi: float | None) -> tuple[int, str, str]:
+    """Map a US AQI value to (band index, label, colour)."""
     aqi = aqi or 0
     for i, (top, label, color) in enumerate(BANDS):
         if aqi <= top:
@@ -78,12 +209,13 @@ def band(aqi):
     return 5, BANDS[-1][1], BANDS[-1][2]
 
 
-def _fmt_hour(h):
+def _fmt_hour(h: int) -> str:
     h = h % 24
     return f"{h % 12 or 12} {'AM' if h < 12 else 'PM'}"
 
 
-def _windows(hours):
+def _windows(hours: list[dict]) -> list[dict]:
+    """Rolling 3-hour averages of the forecast (skips windows with missing data)."""
     out = []
     for i in range(len(hours) - 2):
         w = hours[i:i + 3]
@@ -99,7 +231,7 @@ def _windows(hours):
     return out
 
 
-def _label(win, today):
+def _label(win: dict, today: str) -> dict:
     return {
         "label": f"{_fmt_hour(win['start_h'])} - {_fmt_hour(win['start_h'] + 3)}",
         "day": "today" if win["date"] == today else "tomorrow",
@@ -109,31 +241,42 @@ def _label(win, today):
     }
 
 
-def fetch_air(lat, lon):
-    a = requests.get(AIR_URL, params={
-        "latitude": lat, "longitude": lon,
-        "current": "us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone",
-        "hourly": "us_aqi,pm2_5", "forecast_days": 2, "timezone": "auto",
-    }, timeout=15)
-    a.raise_for_status()
-    a = a.json()
-    cur = a.get("current", {})
-
-    wx = {}
+def _fetch_weather(lat: float, lon: float) -> dict:
+    """Current weather; failures are non-fatal (the plan works without it)."""
     try:
-        w = requests.get(WX_URL, params={
+        r = _http.get(WX_URL, params={
             "latitude": lat, "longitude": lon,
             "current": "temperature_2m,relative_humidity_2m,wind_speed_10m",
             "timezone": "auto",
-        }, timeout=10).json()
-        wx = w.get("current", {})
-    except Exception:
-        pass
+        }, timeout=10)
+        r.raise_for_status()
+        return r.json().get("current", {})
+    except (requests.RequestException, ValueError):
+        return {}
+
+
+def fetch_air(lat: float, lon: float) -> dict:
+    """Live air quality + weather for a point, cached for 10 minutes (~1 km grid)."""
+    key = (round(lat, 2), round(lon, 2))
+    cached = AIR_CACHE.get(key)
+    if cached is not None:
+        return cached
+    with ThreadPoolExecutor(max_workers=1) as pool:  # weather runs while the air request is in flight
+        wx_future = pool.submit(_fetch_weather, lat, lon)
+        a = _http.get(AIR_URL, params={
+            "latitude": lat, "longitude": lon,
+            "current": "us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone",
+            "hourly": "us_aqi,pm2_5", "forecast_days": 2, "timezone": "auto",
+        }, timeout=15)
+        a.raise_for_status()
+        a = a.json()
+        wx = wx_future.result()
+    cur = a.get("current", {})
 
     h = a.get("hourly", {})
     now_key = (cur.get("time") or "")[:13]
     hours = []
-    for t, aq, pm in zip(h.get("time", []), h.get("us_aqi", []), h.get("pm2_5", [])):
+    for t, aq, pm in zip(h.get("time", []), h.get("us_aqi", []), h.get("pm2_5", []), strict=False):
         if t[:13] >= now_key and len(hours) < 24:
             hours.append({"t": t, "aqi": aq, "pm25": pm})
     for x in hours:
@@ -158,7 +301,7 @@ def fetch_air(lat, lon):
         elif d < -max(5, pm25 * 0.15):
             trend = "improving"
 
-    return {
+    result = {
         "time": cur.get("time"),
         "aqi": aqi, "category": label, "color": color, "idx": idx,
         "pm25": pm25, "pm10": cur.get("pm10"),
@@ -171,6 +314,8 @@ def fetch_air(lat, lon):
         "trend": trend, "best": best, "worst": worst,
         "advice": ADVICE[idx], "forecast": hours,
     }
+    AIR_CACHE.set(key, result)
+    return result
 
 
 # ----------------------------------------------------------------------------
@@ -206,16 +351,19 @@ def _exposure(pm, best_pm, out_h, mode, km, windows_closed, purifier, mask, shif
     return total / 24.0
 
 
-def compute_impact(d):
-    f = lambda k, default: float(d.get(k) if d.get(k) not in (None, "") else default)
-    pm = f("pm25", 60)
-    best_pm = min(f("best_pm25", pm * 0.7), pm) if d.get("best_pm25") is not None else pm * 0.75
-    out_h = f("outdoor_hours", 2)
-    km = f("commute_km", 8)
-    mode = d.get("mode") or "two_wheeler"
+def compute_impact(d: dict) -> dict:
+    """Deterministic exposure model. Raises ValueError for non-numeric input.
+
+    Numbers are computed here (never by the LLM) so they are reproducible and explainable.
+    """
+    pm = _num(d, "pm25", 60, 0, 1000)
+    best_pm = min(_num(d, "best_pm25", pm * 0.7, 0, 1000), pm) if d.get("best_pm25") is not None else pm * 0.75
+    out_h = _num(d, "outdoor_hours", 2, 0, 16)
+    km = _num(d, "commute_km", 8, 0, 200)
+    mode = d.get("mode") if d.get("mode") in MODES else "two_wheeler"
     base_closed = (d.get("baseline_windows") == "closed")
     base_pur = bool(d.get("baseline_purifier"))
-    sc = d.get("scenario", {}) or {}
+    sc = d.get("scenario") if isinstance(d.get("scenario"), dict) else {}
     new_mode = sc.get("new_mode") or mode
     if new_mode not in MODES:
         new_mode = mode
@@ -265,13 +413,18 @@ def compute_impact(d):
 
 @app.post("/api/impact")
 def api_impact():
-    return jsonify(compute_impact(request.get_json(force=True) or {}))
+    try:
+        return jsonify(compute_impact(_body()))
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
 
 
 # ----------------------------------------------------------------------------
 # Groq
 # ----------------------------------------------------------------------------
-def groq_chat(messages, json_mode=False, max_tokens=2800, temperature=0.4):
+def groq_chat(messages: list[dict], json_mode: bool = False, max_tokens: int = 2800,
+              temperature: float = 0.4) -> str:
+    """Call Groq chat completions (one retry on 429). Raises RuntimeError on failure."""
     if not GROQ_KEY:
         raise RuntimeError("GROQ_API_KEY is not set")
     body = {"model": GROQ_MODEL, "messages": messages, "temperature": temperature,
@@ -280,7 +433,7 @@ def groq_chat(messages, json_mode=False, max_tokens=2800, temperature=0.4):
         body["response_format"] = {"type": "json_object"}
     last = None
     for attempt in range(2):
-        r = requests.post(GROQ_URL, headers={"Authorization": f"Bearer {GROQ_KEY}"},
+        r = _http.post(GROQ_URL, headers={"Authorization": f"Bearer {GROQ_KEY}"},
                           json=body, timeout=45)
         if r.status_code == 429 and attempt == 0:
             time.sleep(2)
@@ -292,7 +445,8 @@ def groq_chat(messages, json_mode=False, max_tokens=2800, temperature=0.4):
     raise RuntimeError(last or "Groq request failed")
 
 
-def _s(v, n=120):
+def _s(v, n: int = 120) -> str:
+    """Safe, length-limited string (keeps user input from bloating prompts)."""
     return str(v)[:n] if v is not None else ""
 
 
@@ -380,7 +534,7 @@ def llm_plan(ctx, profile, impact, lang):
     imp = (f"IMPACT NUMBERS (computed, use these): current estimated daily PM2.5 exposure "
            f"{impact['baseline_pm25']} ug/m3 -> {impact['scenario_pm25']} ug/m3 if the household follows the plan "
            f"(~{impact['reduction_pct']}% lower). Biggest levers: "
-           + "; ".join(f"{l['label']} (~{l['reduction_pct']}%)" for l in impact["levers"][:3]))
+           + "; ".join(f"{lv['label']} (~{lv['reduction_pct']}%)" for lv in impact["levers"][:3]))
     msgs = [
         {"role": "system", "content": PLAN_SYSTEM + "\n" + lang_rule},
         {"role": "user", "content": ctx_text(ctx, profile) + "\n" + imp},
@@ -465,14 +619,26 @@ def fallback_plan(ctx, profile):
 # ----------------------------------------------------------------------------
 # API routes
 # ----------------------------------------------------------------------------
-def _page(name):
-    """Read an HTML page from disk. Works on a normal server and inside a Vercel function."""
-    for base in (HERE, os.getcwd(), os.path.join(os.getcwd(), "..")):
-        path = os.path.join(base, name)
-        if os.path.isfile(path):
-            with open(path, "rb") as f:
-                return Response(f.read(), mimetype="text/html; charset=utf-8")
-    return Response("Page not found: " + name, status=404)
+_PAGE_CACHE: dict = {}
+
+
+def _page(name: str) -> Response:
+    """Serve an HTML page (read once, then cached with an ETag). Works locally and on Vercel."""
+    if name not in _PAGE_CACHE:
+        for base in (HERE, os.getcwd(), os.path.join(os.getcwd(), "..")):
+            path = os.path.join(base, name)
+            if os.path.isfile(path):
+                with open(path, "rb") as f:
+                    body = f.read()
+                _PAGE_CACHE[name] = (body, hashlib.md5(body).hexdigest())  # noqa: S324 (ETag only)
+                break
+        else:
+            return Response("Page not found: " + name, status=404)
+    body, etag = _PAGE_CACHE[name]
+    resp = Response(body, mimetype="text/html; charset=utf-8")
+    resp.set_etag(etag)
+    resp.headers["Cache-Control"] = "no-cache"  # always revalidate; 304 when unchanged
+    return resp.make_conditional(request)
 
 
 @app.get("/")
@@ -496,46 +662,61 @@ def health():
 
 @app.get("/api/geocode")
 def geocode():
-    q = (request.args.get("q") or "").strip()
+    q = (request.args.get("q") or "").strip()[:80]
     if len(q) < 2:
         return jsonify(results=[])
+    key = q.lower()
+    cached = GEO_CACHE.get(key)
+    if cached is not None:
+        return jsonify(results=cached)
     try:
-        r = requests.get(GEO_URL, params={"name": q, "count": 6, "language": "en", "format": "json"}, timeout=10)
+        r = _http.get(GEO_URL, params={"name": q, "count": 6, "language": "en", "format": "json"}, timeout=10)
+        r.raise_for_status()
         res = [{"name": x.get("name"), "admin": x.get("admin1"), "country": x.get("country"),
                 "lat": x.get("latitude"), "lon": x.get("longitude")} for x in r.json().get("results", [])]
-        return jsonify(results=res)
-    except Exception as e:
+    except (requests.RequestException, ValueError) as e:
         return jsonify(error=f"Search failed: {e}", results=[]), 502
+    GEO_CACHE.set(key, res)
+    return jsonify(results=res)
 
 
 @app.get("/api/air")
 def air():
     try:
-        lat = float(request.args["lat"])
-        lon = float(request.args["lon"])
-        return jsonify(fetch_air(lat, lon))
+        lat, lon = float(request.args["lat"]), float(request.args["lon"])
     except (KeyError, ValueError):
-        return jsonify(error="lat and lon are required"), 400
-    except Exception as e:
+        return jsonify(error="lat and lon are required numbers"), 400
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return jsonify(error="lat must be within [-90, 90] and lon within [-180, 180]"), 400
+    try:
+        return jsonify(fetch_air(lat, lon))
+    except (requests.RequestException, ValueError) as e:
         return jsonify(error=f"Could not load air-quality data: {e}"), 502
 
 
 @app.post("/api/plan")
 def plan():
-    data = request.get_json(force=True) or {}
-    ctx, profile, lang = data.get("context") or {}, data.get("profile") or {}, data.get("lang", "en")
+    data = _body()
+    ctx = data.get("context") if isinstance(data.get("context"), dict) else {}
+    profile = dict(data.get("profile") if isinstance(data.get("profile"), dict) else {})
+    lang = "hi" if data.get("lang") == "hi" else "en"
+    hh = profile.get("household")
+    profile["household"] = [_s(x, 20) for x in hh][:10] if isinstance(hh, list) else []
 
     # Impact if the household follows the plan
     mode = profile.get("mode") or "two_wheeler"
     sc = {"windows_closed": True, "purifier": profile.get("budget") not in ("none",),
           "mask": (ctx.get("pm25") or 0) > 55, "shift_outdoor": True,
           "new_mode": "metro" if (profile.get("transit") and mode in ("car", "two_wheeler", "auto_cab")) else mode}
-    impact = compute_impact({
-        "pm25": ctx.get("pm25") or 60, "best_pm25": (ctx.get("best") or {}).get("pm25"),
-        "outdoor_hours": profile.get("outdoor_hours", 2), "commute_km": profile.get("commute_km", 8),
-        "mode": mode, "baseline_windows": profile.get("windows"),
-        "baseline_purifier": profile.get("purifier_owned"), "scenario": sc,
-    })
+    try:
+        impact = compute_impact({
+            "pm25": ctx.get("pm25") or 60, "best_pm25": (ctx.get("best") or {}).get("pm25"),
+            "outdoor_hours": profile.get("outdoor_hours", 2), "commute_km": profile.get("commute_km", 8),
+            "mode": mode, "baseline_windows": profile.get("windows"),
+            "baseline_purifier": profile.get("purifier_owned"), "scenario": sc,
+        })
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
 
     source, error, plan_obj = "fallback", None, None
     if GROQ_KEY:
@@ -543,8 +724,8 @@ def plan():
             plan_obj = llm_plan(ctx, profile, impact, lang)
             if plan_obj:
                 source = "groq"
-        except Exception as e:  # network, auth, bad JSON...
-            error = str(e)[:200]
+        except (RuntimeError, requests.RequestException, ValueError, KeyError, IndexError) as e:
+            error = str(e)[:200]  # network, auth, bad/missing JSON...
     else:
         error = "GROQ_API_KEY is not configured on the server"
     if not plan_obj:
@@ -567,8 +748,9 @@ CONTEXT
 
 @app.post("/api/chat")
 def chat():
-    data = request.get_json(force=True) or {}
-    msgs = [m for m in (data.get("messages") or []) if m.get("role") in ("user", "assistant")][-10:]
+    data = _body()
+    raw = data.get("messages") if isinstance(data.get("messages"), list) else []
+    msgs = [m for m in raw if isinstance(m, dict) and m.get("role") in ("user", "assistant")][-10:]
     if not msgs:
         return jsonify(error="No message"), 400
     if not GROQ_KEY:
@@ -580,7 +762,7 @@ def chat():
     try:
         reply = groq_chat([{"role": "system", "content": system}] + clean, max_tokens=500, temperature=0.5)
         return jsonify(reply=reply, source="groq")
-    except Exception as e:
+    except (RuntimeError, requests.RequestException, ValueError, KeyError, IndexError) as e:
         return jsonify(error=f"AI is unavailable right now: {str(e)[:160]}"), 502
 
 

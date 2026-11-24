@@ -33,6 +33,18 @@ No Groq key? The app still works in **offline smart-rules mode**, so a demo neve
 - **Graceful degradation:** if Groq/network fails → rule-based plan, clearly labelled.
 - **Privacy:** key stays server-side; profile stored only in the browser's localStorage.
 
+## Quality, security & performance
+
+- **Tests:** 69 automated tests (pytest, ~97% coverage of `app.py`) - the impact model, AQI banding, forecast windows, plan normalisation, fallbacks, every API route, validation, rate limiting and security headers. Upstream APIs are faked, so the suite runs offline in under a second.
+  ```bash
+  pip install -r requirements-dev.txt
+  pytest --cov=app --cov-report=term-missing
+  ```
+  GitHub Actions (`.github/workflows/ci.yml`) runs lint + tests on every push.
+- **Security:** strict CSP and security headers, request-size limit, per-route rate limits, strict input validation and clamping, JSON-only API errors, secrets only on the server (never returned by `/api/health`).
+- **Efficiency:** pooled HTTP session, parallel weather + air fetch, 10-minute air and 1-hour geocode caches, HTML read once with ETag/304 revalidation, gzip on text/JSON.
+- **Accessibility:** skip link, landmarks, labelled controls, live regions for results and errors, `aria-pressed` on toggles, reduced-motion support.
+
 ## Architecture
 
 ```
@@ -40,6 +52,7 @@ Browser (index.html)
    │  /api/geocode  /api/air  /api/impact  /api/plan  /api/chat
 Flask (app.py)
    ├─ Open-Meteo Air Quality + Forecast + Geocoding  → live AQI, forecast, clean windows
+   ├─ TTL cache + pooled session + security middleware
    ├─ Impact engine (pure Python)                    → exposure, cigarettes, CO₂
    └─ Groq chat completions (JSON mode)              → plan + context-aware chat
 ```
